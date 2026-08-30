@@ -733,6 +733,19 @@ $("setPasswordBtn").onclick = async () => {
   }
 };
 
+supabaseClient.auth.onAuthStateChange(
+  async (event, session) => {
+
+    if (
+      event === "PASSWORD_RECOVERY" &&
+      session?.user
+    ) {
+      openModal("setPasswordModal");
+    }
+
+  }
+);
+
 $("forgotPasswordBtn").onclick = async () => {
   const email = $("loginEmail").value.trim();
   const msg = $("loginMessage");
