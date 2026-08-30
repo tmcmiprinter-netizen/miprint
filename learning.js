@@ -1197,6 +1197,7 @@ async function loadAdminCourse() {
       summary,
       published,
       closed,
+      assessment_open,
       created_at,
       updated_at
     `)
@@ -1261,6 +1262,9 @@ async function loadAdminCourse() {
     section: data.section_number || 1,
     summary: data.summary || "",
     published: data.published === true,
+
+    assessmentOpen:
+  data.assessment_open === true,
 
     questions: (questions || []).map(
   question => ({
@@ -1470,6 +1474,11 @@ function renderAssessment(s) {
 function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$("studentResultsContent").innerHTML=a.length?a.map(x=>`<article class="result-card"><div class="result-score ${x.result==="fail"?"fail":""}">${x.score}%</div><div><h3>${esc(state.course.title)} • Attempt ${x.attempt}</h3><p>${new Date(x.submittedAt).toLocaleString()}</p></div><div class="result-status ${x.result}">${x.result.toUpperCase()}</div></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-chart-simple"></i><h3>No results yet</h3><p>Complete your assessment to see your marks.</p></div>`}
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
+
+$("toggleAssessmentBtn").textContent =
+  state.course.assessmentOpen
+    ? "Close Assessment"
+    : "Open Assessment";
 
 function renderAdmin(){const pending=state.applications.filter(a=>a.status==="pending"),approved=state.students.filter(s=>s.active),certs=state.students.flatMap(s=>s.certificates||[]),ranked=approved.map(s=>({s,score:bestScore(s)})).filter(x=>x.score!==null).sort((a,b)=>b.score-a.score);$("adminPendingCount").textContent=pending.length;$("adminApprovedCount").textContent=approved.length;$("adminTopStudent").textContent=ranked.length?`${ranked[0].s.fullName.split(" ")[0]} ${ranked[0].score}%`:"—";$("adminCertificateCount").textContent=certs.length;$("adminCurrentCourse").textContent=state.course.title;$("adminCurrentCourseState").textContent=state.courseClosed?"Course session is closed.":state.course.published?"Course is published for approved students.":"Course is hidden from students.";renderApplications();renderStudents();renderBuilder();renderAdminCerts();$("togglePublishBtn").textContent=state.course.published?"Hide Course":"Publish Course"}
 function renderApplications() {
@@ -2189,6 +2198,72 @@ $("togglePublishBtn").onclick = async () => {
     btn.innerHTML = originalText;
   }
 };
+
+$("toggleAssessmentBtn").onclick = async () => {
+  const btn = $("toggleAssessmentBtn");
+
+  if (!state.course?.id) {
+    alert("No Supabase course was loaded.");
+    return;
+  }
+
+  const newAssessmentState =
+    !state.course.assessmentOpen;
+
+  const originalText =
+    btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("learning_courses")
+      .update({
+        assessment_open:
+          newAssessmentState,
+
+        updated_at:
+          new Date().toISOString()
+      })
+      .eq("id", state.course.id)
+      .select(`
+        id,
+        assessment_open
+      `)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    state.course.assessmentOpen =
+      data.assessment_open === true;
+
+    renderAdmin();
+
+  } catch (error) {
+    console.error(
+      "Assessment status update failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to update assessment status."
+    );
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
+
 $("closeCourseBtn").onclick = async () => {
   const btn = $("closeCourseBtn");
 
