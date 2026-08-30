@@ -2264,7 +2264,6 @@ $("togglePublishBtn").onclick = async () => {
 
   } finally {
     btn.disabled = false;
-    btn.innerHTML = originalText;
   }
 };
 
