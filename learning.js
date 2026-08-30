@@ -1334,6 +1334,9 @@ $("submitAssessmentBtn").onclick = async () => {
         `You scored ${result.score}%. You did not reach 60%.`;
     }
 
+    await loadStudentProgress();
+    renderStudent();
+
   } catch (error) {
     console.error(
       "Assessment submission failed:",
