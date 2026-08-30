@@ -64,6 +64,21 @@ $("registerSubmitBtn").onclick = async () => {
   const file = $("regDocument").files[0];
 
   const fullName = $("regFullName").value.trim();
+  const legalName =
+  fullName.replace(/\s+/g, " ").trim();
+
+const nameParts =
+  legalName.split(" ");
+
+if (nameParts.length < 2) {
+  msg.className =
+    "form-message error";
+
+  msg.textContent =
+    "Enter your surname first, followed by all your names exactly as they appear on your ID or passport.";
+
+  return;
+}
   const email = $("regEmail").value.trim().toLowerCase();
   const phone = $("regPhone").value.trim();
   const nationality = $("regNationality").value;
@@ -132,7 +147,10 @@ $("registerSubmitBtn").onclick = async () => {
 
   const formData = new FormData();
 
-  formData.append("full_name", fullName);
+  formData.append(
+  "full_name",
+  legalName
+);
   formData.append("email", email);
   formData.append("phone", phone);
   formData.append("nationality", nationality);
@@ -2077,7 +2095,120 @@ $("togglePublishBtn").onclick = async () => {
     btn.innerHTML = originalText;
   }
 };
-$("closeCourseBtn").onclick=()=>{if(confirm("Close the current course session?")){state.courseClosed=true;state.course.published=false;saveState();renderAdmin()}};
+$("closeCourseBtn").onclick = async () => {
+  const btn = $("closeCourseBtn");
+
+  if (!state.course?.id) {
+    alert("No course is currently loaded.");
+    return;
+  }
+
+  const confirmed = confirm(
+    "Close this course and start a new blank course?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Closing...';
+
+  try {
+
+    // 1. Close the current course.
+    const {
+      error: closeError
+    } = await supabaseClient
+      .from("learning_courses")
+      .update({
+        closed: true,
+        published: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", state.course.id);
+
+    if (closeError) {
+      throw closeError;
+    }
+
+
+    // 2. Create a completely new blank course.
+    const {
+      data: newCourse,
+      error: createError
+    } = await supabaseClient
+      .from("learning_courses")
+      .insert({
+        title: "New Course",
+        subtitle: "",
+        description: "",
+        section_number: 1,
+        summary: "",
+        published: false,
+        closed: false
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      throw createError;
+    }
+
+
+    // 3. Clear the old course from browser memory.
+    state.course = {
+      id: newCourse.id,
+
+      title:
+        newCourse.title,
+
+      subtitle: "",
+
+      description: "",
+
+      section: 1,
+
+      summary: "",
+
+      published: false,
+
+      questions: []
+    };
+
+    state.courseClosed = false;
+
+    adminQuestionDraft = [];
+
+
+    // 4. Refresh Course Builder.
+    renderAdmin();
+
+    alert(
+      "Course closed. A new blank course is ready."
+    );
+
+  } catch (error) {
+    console.error(
+      "Course closing failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to close the course."
+    );
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML =
+      originalText;
+  }
+};
 
 function renderAdminCerts(){const all=state.students.flatMap(s=>(s.certificates||[]).map(c=>({s,c})));$("certificateAdminList").innerHTML=all.length?all.map(({s,c})=>`<article class="certificate-card"><h3>${esc(s.fullName)}</h3><p><strong>${esc(c.certificateCode||"Pending code")}</strong> • ${esc(c.courseTitle)} • ${c.score}% • ${new Date(c.awardedAt).toLocaleDateString()}</p><button class="primary-btn" onclick="openCertificate('${s.id}','${c.id}')">Print / Save PDF</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3></div>`}
 window.openCertificate=(sid,cid)=>{const s=state.students.find(x=>x.id===sid),c=s?.certificates?.find(x=>x.id===cid);if(!s||!c)return;$("certificatePreview").innerHTML=`<div class="certificate-sheet"><div class="cert-brand"><span>mi</span> Print Learning</div><h2>Certificate of Completion</h2><p>This certificate is proudly awarded to</p><div class="student-name">${esc(s.fullName)}</div><p>Certificate No. <strong>${esc(c.certificateCode||"MIP-LEGACY")}</strong></p><p>for successfully completing</p><div class="cert-course">${esc(c.courseTitle)}</div><p>with a final recorded score of <strong>${c.score}%</strong>.</p><div class="cert-footer"><span>Awarded: ${new Date(c.awardedAt).toLocaleDateString()}</span><span>mi Print • Tiangmaatla Multipurpose</span></div></div>`;openModal("certificateModal")};

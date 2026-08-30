@@ -78,7 +78,22 @@
 </div>
 
 <div class="modal" id="registerModal"><div class="modal-card wide"><button class="modal-close" data-close="registerModal"><i class="fa-solid fa-xmark"></i></button><span class="modal-kicker">Student Application</span><h2>Register for training</h2><p>Complete all required information. Your application will be reviewed before course access is activated.</p><div class="form-grid">
-<div class="field span-2"><label>Full name</label><input id="regFullName" type="text"></div>
+<label>
+  Surname and all names exactly as on ID / Passport
+</label>
+
+<input
+  id="regFullName"
+  type="text"
+  placeholder="Example: MOKOENA KGOMOTSO THABO"
+  autocomplete="name"
+>
+
+<small class="field-help">
+  Enter your surname first, followed by all your names exactly
+  as they appear on your ID or passport. This name will appear
+  on your certificate.
+</small>
 <div class="field"><label>Email address</label><input id="regEmail" type="email"></div><div class="field"><label>Phone number</label><input id="regPhone" type="tel"></div>
 <div class="field"><label>Nationality</label><select id="regNationality"><option>South African</option><option>Other</option></select></div><div class="field"><label>Year of birth</label><input id="regBirthYear" type="number" min="1930" max="2020"></div>
 <div class="field span-2"><label id="identityLabel">South African identity number</label><input id="regIdentity" type="text"></div>
