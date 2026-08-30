@@ -541,11 +541,257 @@ async function loadCurrentStudent(authUserId) {
   return student;
 }
 
+async function checkInvitationSession() {
+  try {
+    const {
+      data: { session }
+    } = await supabaseClient.auth.getSession();
+
+    if (!session?.user) {
+      return;
+    }
+
+    const user = session.user;
+
+    // Admins should not see the password setup modal.
+    const {
+      data: isAdmin,
+      error: adminError
+    } = await supabaseClient.rpc(
+      "is_learning_admin"
+    );
+
+    if (!adminError && isAdmin === true) {
+      return;
+    }
+
+    // Check if this authenticated user is an approved student.
+    const {
+      data: student,
+      error
+    } = await supabaseClient
+      .from("learning_students")
+      .select(`
+        id,
+        active,
+        auth_user_id
+      `)
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Invitation student check failed:",
+        error
+      );
+
+      return;
+    }
+
+    if (!student) {
+      return;
+    }
+
+    if (!student.active) {
+      return;
+    }
+
+    // Student is authenticated through the invitation.
+    // Show password creation modal.
+    openModal("setPasswordModal");
+
+  } catch (error) {
+    console.error(
+      "Invitation session check failed:",
+      error
+    );
+  }
+}
+
+$("setPasswordBtn").onclick = async () => {
+  const password =
+    $("newStudentPassword").value;
+
+  const confirmPassword =
+    $("confirmStudentPassword").value;
+
+  const msg =
+    $("setPasswordMessage");
+
+  const btn =
+    $("setPasswordBtn");
+
+  msg.className =
+    "form-message";
+
+  msg.textContent = "";
+
+  if (
+    !password ||
+    !confirmPassword
+  ) {
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      "Please enter and confirm your password.";
+
+    return;
+  }
+
+  if (password.length < 8) {
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      "Password must be at least 8 characters.";
+
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      "The passwords do not match.";
+
+    return;
+  }
+
+  const originalText =
+    btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Creating password...';
+
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.auth.updateUser({
+      password
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data.user) {
+      throw new Error(
+        "Password could not be created."
+      );
+    }
+
+    msg.className =
+      "form-message success";
+
+    msg.textContent =
+      "Password created successfully.";
+
+    $("newStudentPassword").value = "";
+    $("confirmStudentPassword").value = "";
+
+    setTimeout(async () => {
+      closeModal(
+        "setPasswordModal"
+      );
+
+      // Sign them out so they can test
+      // the normal student login.
+      await supabaseClient.auth.signOut();
+
+      openModal("loginModal");
+
+      $("loginMessage").className =
+        "form-message success";
+
+      $("loginMessage").textContent =
+        "Your password is ready. Log in with your student email and new password.";
+
+    }, 1200);
+
+  } catch (error) {
+    console.error(
+      "Password creation failed:",
+      error
+    );
+
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      error?.message ||
+      "Unable to create your password.";
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML =
+      originalText;
+  }
+};
+
+$("forgotPasswordBtn").onclick = async () => {
+  const email = $("loginEmail").value.trim();
+  const msg = $("loginMessage");
+  const btn = $("forgotPasswordBtn");
+
+  msg.className = "form-message";
+  msg.textContent = "";
+
+  if (!email) {
+    msg.className = "form-message error";
+    msg.textContent =
+      "Enter your student email address first.";
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+
+  try {
+    const { error } =
+      await supabaseClient.auth.resetPasswordForEmail(
+        email,
+        {
+          redirectTo:
+            "https://tmcmiprinter-netizen.github.io/miprint/learning.html"
+        }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    msg.className = "form-message success";
+    msg.textContent =
+      "Check your email for the password setup link.";
+
+  } catch (error) {
+    console.error(error);
+
+    msg.className = "form-message error";
+    msg.textContent =
+      error?.message ||
+      "Unable to send password setup email.";
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
+
 function hidePublic(){document.querySelector(".topbar").classList.add("hidden");$("publicLanding").classList.add("hidden")}
 function showPublic(){document.querySelector(".topbar").classList.remove("hidden");$("publicLanding").classList.remove("hidden");$("studentApp").classList.add("hidden");$("adminApp").classList.add("hidden");session=null}
 $("studentLogoutBtn").onclick=showPublic;$("adminLogoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
   showPublic();
+  checkInvitationSession();
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
 function showStudent(){hidePublic();$("studentApp").classList.remove("hidden");$("adminApp").classList.add("hidden");renderStudent();showStudentView("studentDashboard")}
