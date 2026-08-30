@@ -118,7 +118,31 @@
 <section id="adminDashboard" class="app-view"><div class="view-head"><div><span>Administration</span><h2>Learning Overview</h2></div><div class="status-chip green">Admin</div></div><div class="dashboard-cards"><article><i class="fa-solid fa-inbox"></i><span>Applications</span><strong id="adminPendingCount">0</strong></article><article><i class="fa-solid fa-user-graduate"></i><span>Approved students</span><strong id="adminApprovedCount">0</strong></article><article><i class="fa-solid fa-trophy"></i><span>Top student</span><strong id="adminTopStudent">—</strong></article><article><i class="fa-solid fa-award"></i><span>Certificates</span><strong id="adminCertificateCount">0</strong></article></div><div class="dashboard-grid"><article class="panel"><span class="panel-kicker">Current course</span><h3 id="adminCurrentCourse"></h3><p id="adminCurrentCourseState"></p><button class="primary-btn" data-admin-jump="adminCourse">Manage Course</button></article><article class="panel"><span class="panel-kicker">Course workflow</span><ol class="mini-steps"><li>Create summary & questions</li><li>Promote course & collect applications</li><li>Approve students</li><li>Publish lesson</li><li>Print certificates</li><li>Close course session</li></ol></article></div></section>
 <section id="adminApplications" class="app-view hidden"><div class="view-head"><div><span>Admissions</span><h2>Applications</h2></div></div><div id="applicationsTable" class="data-list"></div></section>
 <section id="adminStudents" class="app-view hidden"><div class="view-head"><div><span>Course list</span><h2>Students</h2></div></div><div id="studentsTable" class="data-list"></div></section>
-<section id="adminCourse" class="app-view hidden"><div class="view-head"><div><span>Course Builder</span><h2>Create & Publish Lesson</h2></div><div class="inline-actions"><button id="togglePublishBtn" class="primary-btn">Publish Course</button><button id="closeCourseBtn" class="danger-btn">Close Course Session</button></div></div><div class="builder-grid"><div class="panel"><div class="field"><label>Course title</label><input id="courseTitleInput"></div><div class="field"><label>Subtitle</label><input id="courseSubtitleInput"></div><div class="field"><label>Course description</label><textarea id="courseDescriptionInput" rows="4"></textarea></div><div class="field"><label>Section number</label><input id="courseSectionInput" type="number" min="1"></div><div class="field"><label>Section summary</label><textarea id="courseSummaryInput" rows="9"></textarea></div><button id="saveCourseInfoBtn" class="primary-btn full">Save Course Information</button></div><div class="panel"><div class="panel-title-row"><div><span class="panel-kicker">Question Builder</span><h3>Multiple-choice questions</h3></div><button id="addQuestionBtn" class="ghost-btn small">+ Add Question</button></div><div id="questionBuilder"></div><button id="saveQuestionsBtn" class="primary-btn full">Save Questions</button></div></div></section>
+<section id="adminCourse" class="app-view hidden"><div class="view-head"><div><span>Course Builder</span><h2>Create & Publish Lesson</h2></div><div class="inline-actions">
+
+  <button
+    id="togglePublishBtn"
+    class="primary-btn"
+  >
+    Publish Course
+  </button>
+
+  <button
+    id="toggleAssessmentBtn"
+    class="secondary-btn"
+  >
+    Open Assessment
+  </button>
+
+  <button
+    id="closeCourseBtn"
+    class="danger-btn"
+  >
+    Close Course Session
+  </button>
+
+</div>
+</div><div class="builder-grid"><div class="panel"><div class="field"><label>Course title</label><input id="courseTitleInput"></div><div class="field"><label>Subtitle</label><input id="courseSubtitleInput"></div><div class="field"><label>Course description</label><textarea id="courseDescriptionInput" rows="4"></textarea></div><div class="field"><label>Section number</label><input id="courseSectionInput" type="number" min="1"></div><div class="field"><label>Section summary</label><textarea id="courseSummaryInput" rows="9"></textarea></div><button id="saveCourseInfoBtn" class="primary-btn full">Save Course Information</button></div><div class="panel"><div class="panel-title-row"><div><span class="panel-kicker">Question Builder</span><h3>Multiple-choice questions</h3></div><button id="addQuestionBtn" class="ghost-btn small">+ Add Question</button></div><div id="questionBuilder"></div><button id="saveQuestionsBtn" class="primary-btn full">Save Questions</button></div></div></section>
 <section id="adminCertificates" class="app-view hidden"><div class="view-head"><div><span>Certificates</span><h2>Certificate Register</h2></div></div><div id="certificateAdminList" class="certificate-list"></div></section>
 </div></section>
 
