@@ -807,7 +807,394 @@ $("studentLogoutBtn").onclick=showPublic;$("adminLogoutBtn").onclick = async () 
   checkInvitationSession();
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
-function showStudent(){hidePublic();$("studentApp").classList.remove("hidden");$("adminApp").classList.add("hidden");renderStudent();showStudentView("studentDashboard")}
+async function loadStudentCourse() {
+  const {
+    data: course,
+    error
+  } = await supabaseClient
+    .from("learning_courses")
+    .select(`
+      id,
+      title,
+      subtitle,
+      description,
+      section_number,
+      summary,
+      published,
+      closed
+    `)
+    .eq("published", true)
+    .eq("closed", false)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Unable to load student course:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load the course."
+    );
+  }
+
+  if (!course) {
+    state.course = {
+      id: null,
+      title: "No course available",
+      subtitle: "",
+      description:
+        "There is currently no published course.",
+      section: 1,
+      summary: "",
+      published: false,
+      questions: []
+    };
+
+    state.courseClosed = true;
+
+    return null;
+  }
+
+  const {
+  data: assessmentRows,
+  error: assessmentError
+} = await supabaseClient.rpc(
+  "get_learning_assessment_options",
+  {
+    p_course_id: course.id
+  }
+);
+
+if (assessmentError) {
+  console.error(
+    "Unable to load assessment options:",
+    assessmentError
+  );
+
+  throw new Error(
+    "Unable to load the assessment."
+  );
+}
+
+const questionMap = new Map();
+
+for (const row of assessmentRows || []) {
+  if (!questionMap.has(row.question_id)) {
+    questionMap.set(
+      row.question_id,
+      {
+        id: row.question_id,
+        text: row.question_text,
+        sortOrder:
+          row.question_sort_order || 0,
+        answers: []
+      }
+    );
+  }
+
+  questionMap
+    .get(row.question_id)
+    .answers.push({
+      id: row.answer_id,
+      text: row.answer_text,
+      sortOrder:
+        row.answer_sort_order || 0
+    });
+}
+
+const studentQuestions =
+  Array.from(
+    questionMap.values()
+  )
+    .sort(
+      (a, b) =>
+        a.sortOrder -
+        b.sortOrder
+    )
+    .map(question => ({
+      id: question.id,
+      text: question.text,
+
+      answers:
+        question.answers
+          .sort(
+            (a, b) =>
+              a.sortOrder -
+              b.sortOrder
+          )
+          .map(answer => ({
+            id: answer.id,
+            text: answer.text
+          }))
+    }));
+
+  state.course = {
+    id: course.id,
+    title: course.title,
+    subtitle: course.subtitle || "",
+    description: course.description || "",
+    section: course.section_number || 1,
+    summary: course.summary || "",
+    published: course.published === true,
+    questions: studentQuestions
+  };
+
+  state.courseClosed =
+    course.closed === true;
+
+  return state.course;
+}
+
+async function loadStudentProgress() {
+  const student =
+    currentStudent();
+
+  if (!student?.id) {
+    throw new Error(
+      "Student account could not be loaded."
+    );
+  }
+
+  const {
+    data: attempts,
+    error: attemptsError
+  } = await supabaseClient
+    .from("learning_attempts")
+    .select(`
+      id,
+      course_id,
+      attempt_number,
+      score,
+      result,
+      submitted_at
+    `)
+    .eq("student_id", student.id)
+    .order("attempt_number", {
+      ascending: true
+    });
+
+  if (attemptsError) {
+    console.error(
+      "Unable to load attempts:",
+      attemptsError
+    );
+
+    throw attemptsError;
+  }
+
+  const {
+    data: certificates,
+    error: certificatesError
+  } = await supabaseClient
+    .from("learning_certificates")
+    .select(`
+      id,
+      course_id,
+      certificate_number,
+      score,
+      awarded_at
+    `)
+    .eq("student_id", student.id)
+    .order("awarded_at", {
+      ascending: false
+    });
+
+  if (certificatesError) {
+    console.error(
+      "Unable to load certificates:",
+      certificatesError
+    );
+
+    throw certificatesError;
+  }
+
+  student.progress = {};
+
+  for (const attempt of attempts || []) {
+    if (!student.progress[attempt.course_id]) {
+      student.progress[attempt.course_id] = {
+        attempts: []
+      };
+    }
+
+    student.progress[
+      attempt.course_id
+    ].attempts.push({
+      id: attempt.id,
+      attemptNumber:
+        attempt.attempt_number,
+      score: attempt.score,
+      result: attempt.result,
+      submittedAt:
+        attempt.submitted_at
+    });
+  }
+
+  student.certificates =
+    (certificates || []).map(
+      certificate => ({
+        id: certificate.id,
+        courseId:
+          certificate.course_id,
+        number:
+          certificate.certificate_number,
+        score:
+          certificate.score,
+        awardedAt:
+          certificate.awarded_at
+      })
+    );
+}
+
+async function showStudent() {
+  try {
+    await loadStudentCourse();
+    await loadStudentProgress();
+
+    hidePublic();
+
+    hidePublic();
+
+    $("studentApp")
+      .classList.remove("hidden");
+
+    $("adminApp")
+      .classList.add("hidden");
+
+    renderStudent();
+
+    showStudentView(
+      "studentDashboard"
+    );
+
+  } catch (error) {
+    console.error(
+      "Student course loading failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to load your course."
+    );
+  }
+}
+
+async function loadAdminCourse() {
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("learning_courses")
+    .select(`
+      id,
+      title,
+      subtitle,
+      description,
+      section_number,
+      summary,
+      published,
+      closed,
+      created_at,
+      updated_at
+    `)
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Unable to load course:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load the learning course."
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const {
+    data: questions,
+    error: questionsError
+  } = await supabaseClient
+    .from("learning_questions")
+    .select(`
+      id,
+      question_text,
+      sort_order,
+      learning_answers (
+        id,
+        answer_text,
+        is_correct,
+        sort_order
+      )
+    `)
+    .eq("course_id", data.id)
+    .order("sort_order", {
+      ascending: true
+    });
+
+  if (questionsError) {
+    console.error(
+      "Unable to load questions:",
+      questionsError
+    );
+
+    throw new Error(
+      "Unable to load course questions."
+    );
+  }
+
+  state.course = {
+    id: data.id,
+    title: data.title,
+    subtitle: data.subtitle || "",
+    description: data.description || "",
+    section: data.section_number || 1,
+    summary: data.summary || "",
+    published: data.published === true,
+
+    questions: (questions || []).map(
+  question => ({
+    id: question.id,
+
+    text:
+      question.question_text,
+
+    answers:
+      (question.learning_answers || [])
+        .sort(
+          (a, b) =>
+            (a.sort_order || 0) -
+            (b.sort_order || 0)
+        )
+        .map(answer => ({
+          id: answer.id,
+          text: answer.answer_text,
+          correct:
+            answer.is_correct === true
+        }))
+  })
+)
+  };
+
+  state.courseClosed =
+    data.closed === true;
+
+  return state.course;
+}
+
 async function showAdmin() {
   hidePublic();
 
@@ -815,8 +1202,9 @@ async function showAdmin() {
   $("studentApp").classList.add("hidden");
 
   try {
-  await loadAdminApplications();
-  await loadAdminStudents();
+ await loadAdminApplications();
+await loadAdminStudents();
+await loadAdminCourse();
 
   renderAdmin();
     showAdminView("adminDashboard");
@@ -856,8 +1244,114 @@ function nextCertificateCode(){
  state.certificateSequence[year]=(state.certificateSequence[year]||0)+1;
  return `MIP-${year}-${String(state.certificateSequence[year]).padStart(5,"0")}`;
 }
-function renderAssessment(s){const attempts=s.progress?.[state.course.id]?.attempts||[],disabled=attempts.length>=2;$("assessmentForm").innerHTML=state.course.questions.map((q,qi)=>`<div class="question-card"><h4>${qi+1}. ${esc(q.text)}</h4>${q.answers.map((a,ai)=>`<label class="option"><input type="checkbox" name="${q.id}" value="${ai}" ${disabled?"disabled":""}><span>${esc(a.text)}</span></label>`).join("")}</div>`).join("");$("submitAssessmentBtn").disabled=disabled;$("submitAssessmentBtn").textContent=disabled?"No attempts remaining":"Submit Assessment"}
-$("submitAssessmentBtn").onclick=()=>{const s=currentStudent();s.progress ||= {};s.progress[state.course.id] ||= {attempts:[]};const p=s.progress[state.course.id];if(p.attempts.length>=2)return;let correct=0;for(const q of state.course.questions){const sel=$$(`input[name="${q.id}"]:checked`).map(i=>+i.value).sort(),ans=q.answers.map((a,i)=>a.correct?i:null).filter(i=>i!==null).sort();if(JSON.stringify(sel)===JSON.stringify(ans))correct++}const score=Math.round(correct/state.course.questions.length*100),result=score>=60?"pass":"fail";p.attempts.push({attempt:p.attempts.length+1,score,result,submittedAt:new Date().toISOString()});if(score>=60&&!hasCert(s)){s.certificates ||= [];s.certificates.push({id:crypto.randomUUID(),certificateCode:nextCertificateCode(),courseId:state.course.id,courseTitle:state.course.title,score,awardedAt:new Date().toISOString()})}saveState();$("assessmentMessage").className=`form-message ${result==="pass"?"success":"error"}`;$("assessmentMessage").textContent=result==="pass"?`You scored ${score}%. PASS.`:`You scored ${score}%. You did not reach 60%.${p.attempts.length<2?" You can start over with your second attempt.":""}`;renderStudent()};
+function renderAssessment(s){const attempts=s.progress?.[state.course.id]?.attempts||[],disabled=attempts.length>=2;$("assessmentForm").innerHTML=state.course.questions.map((q,qi)=>`<div class="question-card"><h4>${qi+1}. ${esc(q.text)}</h4>${q.answers.map((a,ai)=>`<label class="option"><input type="checkbox" name="${q.id}" value="${a.id}" ${disabled?"disabled":""}><span>${esc(a.text)}</span></label>`).join("")}</div>`).join("");$("submitAssessmentBtn").disabled=disabled;$("submitAssessmentBtn").textContent=disabled?"No attempts remaining":"Submit Assessment"}
+$("submitAssessmentBtn").onclick = async () => {
+  const btn = $("submitAssessmentBtn");
+  const msg = $("assessmentMessage");
+
+  msg.className = "form-message";
+  msg.textContent = "";
+
+  if (!state.course?.id) {
+    msg.className = "form-message error";
+    msg.textContent =
+      "No course is currently available.";
+    return;
+  }
+
+  const selectedAnswerIds = [];
+
+  for (const question of state.course.questions) {
+    const selected = document.querySelector(
+      `input[name="${question.id}"]:checked`
+    );
+
+    if (!selected) {
+      msg.className =
+        "form-message error";
+
+      msg.textContent =
+        "Please answer every question.";
+
+      return;
+    }
+
+    selectedAnswerIds.push(
+      selected.value
+    );
+  }
+
+  const originalText =
+    btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.rpc(
+      "submit_learning_assessment",
+      {
+        p_course_id:
+          state.course.id,
+
+        p_answer_ids:
+          selectedAnswerIds
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    const result =
+      Array.isArray(data)
+        ? data[0]
+        : data;
+
+    if (!result) {
+      throw new Error(
+        "Assessment result was not returned."
+      );
+    }
+
+    msg.className =
+      `form-message ${
+        result.result === "pass"
+          ? "success"
+          : "error"
+      }`;
+
+    if (result.result === "pass") {
+      msg.textContent =
+        `You scored ${result.score}%. PASS.`;
+    } else {
+      msg.textContent =
+        `You scored ${result.score}%. You did not reach 60%.`;
+    }
+
+  } catch (error) {
+    console.error(
+      "Assessment submission failed:",
+      error
+    );
+
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      error?.message ||
+      "Unable to submit the assessment.";
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
 function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$("studentResultsContent").innerHTML=a.length?a.map(x=>`<article class="result-card"><div class="result-score ${x.result==="fail"?"fail":""}">${x.score}%</div><div><h3>${esc(state.course.title)} • Attempt ${x.attempt}</h3><p>${new Date(x.submittedAt).toLocaleString()}</p></div><div class="result-status ${x.result}">${x.result.toUpperCase()}</div></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-chart-simple"></i><h3>No results yet</h3><p>Complete your assessment to see your marks.</p></div>`}
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
@@ -1098,9 +1592,488 @@ function renderBuilder(){["courseTitleInput","courseSubtitleInput","courseDescri
 function renderQuestionBuilder(){$("questionBuilder").innerHTML=adminQuestionDraft.map((q,qi)=>`<div class="question-builder-item"><label>Question ${qi+1}</label><textarea data-q="${qi}" rows="2">${esc(q.text)}</textarea>${q.answers.map((a,ai)=>`<div class="answer-grid"><input data-a="${qi}:${ai}" value="${esc(a.text)}"><label class="correct-toggle"><input type="checkbox" data-c="${qi}:${ai}" ${a.correct?"checked":""}> Correct</label></div>`).join("")}<button class="remove-q" onclick="removeQuestion(${qi})">Remove question</button></div>`).join("")}
 $("addQuestionBtn").onclick=()=>{adminQuestionDraft.push({id:crypto.randomUUID(),text:"New question",answers:[{text:"Option A",correct:true},{text:"Option B",correct:false},{text:"Option C",correct:false},{text:"Option D",correct:false}]});renderQuestionBuilder()};
 window.removeQuestion=i=>{adminQuestionDraft.splice(i,1);renderQuestionBuilder()};
-$("saveCourseInfoBtn").onclick=()=>{state.course.title=$("courseTitleInput").value.trim()||"Untitled Course";state.course.subtitle=$("courseSubtitleInput").value.trim();state.course.description=$("courseDescriptionInput").value.trim();state.course.section=+$("courseSectionInput").value||1;state.course.summary=$("courseSummaryInput").value.trim();saveState();alert("Course information saved.");renderAdmin()};
-$("saveQuestionsBtn").onclick=()=>{$$("[data-q]").forEach(e=>adminQuestionDraft[+e.dataset.q].text=e.value.trim());$$("[data-a]").forEach(e=>{const [q,a]=e.dataset.a.split(":").map(Number);adminQuestionDraft[q].answers[a].text=e.value.trim()});$$("[data-c]").forEach(e=>{const [q,a]=e.dataset.c.split(":").map(Number);adminQuestionDraft[q].answers[a].correct=e.checked});state.course.questions=JSON.parse(JSON.stringify(adminQuestionDraft));saveState();alert("Questions saved.")};
-$("togglePublishBtn").onclick=()=>{state.course.published=!state.course.published;saveState();renderAdmin()};
+$("saveCourseInfoBtn").onclick = async () => {
+  const btn = $("saveCourseInfoBtn");
+
+  const title =
+    $("courseTitleInput").value.trim() ||
+    "Untitled Course";
+
+  const subtitle =
+    $("courseSubtitleInput").value.trim();
+
+  const description =
+    $("courseDescriptionInput").value.trim();
+
+  const sectionNumber =
+    Number($("courseSectionInput").value) || 1;
+
+  const summary =
+    $("courseSummaryInput").value.trim();
+
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+  try {
+    if (!state.course?.id) {
+      throw new Error(
+        "No Supabase course was loaded."
+      );
+    }
+
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("learning_courses")
+      .update({
+        title,
+        subtitle,
+        description,
+        section_number: sectionNumber,
+        summary,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", state.course.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    state.course.title =
+      data.title;
+
+    state.course.subtitle =
+      data.subtitle || "";
+
+    state.course.description =
+      data.description || "";
+
+    state.course.section =
+      data.section_number || 1;
+
+    state.course.summary =
+      data.summary || "";
+
+    renderAdmin();
+
+    alert(
+      "Course information saved successfully."
+    );
+
+  } catch (error) {
+    console.error(
+      "Course save failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to save course information."
+    );
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
+$("saveQuestionsBtn").onclick = async () => {
+  const btn = $("saveQuestionsBtn");
+
+  if (!state.course?.id) {
+    alert("No Supabase course was loaded.");
+    return;
+  }
+
+  // Copy what the admin typed into adminQuestionDraft.
+  $$("[data-q]").forEach(element => {
+    const questionIndex =
+      Number(element.dataset.q);
+
+    adminQuestionDraft[questionIndex].text =
+      element.value.trim();
+  });
+
+  $$("[data-a]").forEach(element => {
+    const [questionIndex, answerIndex] =
+      element.dataset.a
+        .split(":")
+        .map(Number);
+
+    adminQuestionDraft[questionIndex]
+      .answers[answerIndex]
+      .text = element.value.trim();
+  });
+
+  $$("[data-c]").forEach(element => {
+    const [questionIndex, answerIndex] =
+      element.dataset.c
+        .split(":")
+        .map(Number);
+
+    adminQuestionDraft[questionIndex]
+      .answers[answerIndex]
+      .correct = element.checked;
+  });
+
+  if (!adminQuestionDraft.length) {
+    alert(
+      "Add at least one question before saving."
+    );
+    return;
+  }
+
+  // Validate questions before touching Supabase.
+  for (
+    let i = 0;
+    i < adminQuestionDraft.length;
+    i++
+  ) {
+    const question =
+      adminQuestionDraft[i];
+
+    if (!question.text) {
+      alert(
+        `Question ${i + 1} cannot be empty.`
+      );
+      return;
+    }
+
+    if (!question.answers?.length) {
+      alert(
+        `Question ${i + 1} needs answers.`
+      );
+      return;
+    }
+
+    const emptyAnswer =
+      question.answers.some(
+        answer => !answer.text
+      );
+
+    if (emptyAnswer) {
+      alert(
+        `Complete all answers for Question ${i + 1}.`
+      );
+      return;
+    }
+
+    const correctAnswers =
+      question.answers.filter(
+        answer => answer.correct
+      );
+
+    if (correctAnswers.length !== 1) {
+      alert(
+        `Question ${i + 1} must have exactly one correct answer.`
+      );
+      return;
+    }
+  }
+
+  const originalText =
+    btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+  try {
+
+    /*
+     * -------------------------------------------------
+     * 1. Remove questions deleted in the builder
+     * -------------------------------------------------
+     */
+
+    const oldQuestions =
+      state.course.questions || [];
+
+    const draftQuestionIds =
+      adminQuestionDraft.map(
+        question => question.id
+      );
+
+    const removedQuestions =
+      oldQuestions.filter(
+        question =>
+          question.id &&
+          !draftQuestionIds.includes(
+            question.id
+          )
+      );
+
+    for (
+      const question of removedQuestions
+    ) {
+
+      // Delete answers first.
+      const {
+        error: answerDeleteError
+      } = await supabaseClient
+        .from("learning_answers")
+        .delete()
+        .eq(
+          "question_id",
+          question.id
+        );
+
+      if (answerDeleteError) {
+        throw answerDeleteError;
+      }
+
+      const {
+        error: questionDeleteError
+      } = await supabaseClient
+        .from("learning_questions")
+        .delete()
+        .eq("id", question.id);
+
+      if (questionDeleteError) {
+        throw questionDeleteError;
+      }
+    }
+
+
+    /*
+     * -------------------------------------------------
+     * 2. Save every question
+     * -------------------------------------------------
+     */
+
+    for (
+      let questionIndex = 0;
+      questionIndex <
+        adminQuestionDraft.length;
+      questionIndex++
+    ) {
+      const question =
+        adminQuestionDraft[
+          questionIndex
+        ];
+
+      if (!question.id) {
+        question.id =
+          crypto.randomUUID();
+      }
+
+      const {
+        error: questionError
+      } = await supabaseClient
+        .from("learning_questions")
+        .upsert({
+          id: question.id,
+
+          course_id:
+            state.course.id,
+
+          question_text:
+            question.text,
+
+          sort_order:
+            questionIndex
+        });
+
+      if (questionError) {
+        throw questionError;
+      }
+
+
+      /*
+       * -----------------------------------------------
+       * 3. Remove answers deleted from this question
+       * -----------------------------------------------
+       */
+
+      const oldQuestion =
+        oldQuestions.find(
+          item =>
+            item.id === question.id
+        );
+
+      const oldAnswers =
+        oldQuestion?.answers || [];
+
+      const draftAnswerIds =
+        question.answers
+          .filter(answer => answer.id)
+          .map(answer => answer.id);
+
+      const removedAnswers =
+        oldAnswers.filter(
+          answer =>
+            answer.id &&
+            !draftAnswerIds.includes(
+              answer.id
+            )
+        );
+
+      for (
+        const answer of removedAnswers
+      ) {
+        const {
+          error: deleteError
+        } = await supabaseClient
+          .from("learning_answers")
+          .delete()
+          .eq("id", answer.id);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+      }
+
+
+      /*
+       * -----------------------------------------------
+       * 4. Save answers
+       * -----------------------------------------------
+       */
+
+      for (
+        let answerIndex = 0;
+        answerIndex <
+          question.answers.length;
+        answerIndex++
+      ) {
+        const answer =
+          question.answers[
+            answerIndex
+          ];
+
+        if (!answer.id) {
+          answer.id =
+            crypto.randomUUID();
+        }
+
+        const {
+          error: answerError
+        } = await supabaseClient
+          .from("learning_answers")
+          .upsert({
+            id: answer.id,
+
+            question_id:
+              question.id,
+
+            answer_text:
+              answer.text,
+
+            is_correct:
+              answer.correct === true,
+
+            sort_order:
+              answerIndex
+          });
+
+        if (answerError) {
+          throw answerError;
+        }
+      }
+    }
+
+
+    /*
+     * -------------------------------------------------
+     * 5. Update browser state
+     * -------------------------------------------------
+     */
+
+    state.course.questions =
+      JSON.parse(
+        JSON.stringify(
+          adminQuestionDraft
+        )
+      );
+
+    alert(
+      "Questions saved successfully."
+    );
+
+    renderAdmin();
+
+  } catch (error) {
+    console.error(
+      "Question save failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to save the questions."
+    );
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML =
+      originalText;
+  }
+};
+$("togglePublishBtn").onclick = async () => {
+  const btn = $("togglePublishBtn");
+
+  if (!state.course?.id) {
+    alert("No Supabase course was loaded.");
+    return;
+  }
+
+  const newPublishedState =
+    !state.course.published;
+
+  const originalText =
+    btn.innerHTML;
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("learning_courses")
+      .update({
+        published: newPublishedState,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", state.course.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    state.course.published =
+      data.published === true;
+
+    renderAdmin();
+
+  } catch (error) {
+    console.error(
+      "Course publish update failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to update course status."
+    );
+
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+};
 $("closeCourseBtn").onclick=()=>{if(confirm("Close the current course session?")){state.courseClosed=true;state.course.published=false;saveState();renderAdmin()}};
 
 function renderAdminCerts(){const all=state.students.flatMap(s=>(s.certificates||[]).map(c=>({s,c})));$("certificateAdminList").innerHTML=all.length?all.map(({s,c})=>`<article class="certificate-card"><h3>${esc(s.fullName)}</h3><p><strong>${esc(c.certificateCode||"Pending code")}</strong> • ${esc(c.courseTitle)} • ${c.score}% • ${new Date(c.awardedAt).toLocaleDateString()}</p><button class="primary-btn" onclick="openCertificate('${s.id}','${c.id}')">Print / Save PDF</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3></div>`}
