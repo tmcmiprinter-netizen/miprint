@@ -826,6 +826,7 @@ $("studentLogoutBtn").onclick=showPublic;$("adminLogoutBtn").onclick = async () 
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
 async function loadStudentCourse() {
+
   const {
     data: course,
     error
@@ -839,7 +840,8 @@ async function loadStudentCourse() {
       section_number,
       summary,
       published,
-      closed
+      closed,
+      assessment_open
     `)
     .eq("published", true)
     .eq("closed", false)
@@ -849,7 +851,9 @@ async function loadStudentCourse() {
     .limit(1)
     .maybeSingle();
 
+
   if (error) {
+
     console.error(
       "Unable to load student course:",
       error
@@ -860,7 +864,12 @@ async function loadStudentCourse() {
     );
   }
 
+
+  /*
+   * No published course.
+   */
   if (!course) {
+
     state.course = {
       id: null,
       title: "No course available",
@@ -870,6 +879,7 @@ async function loadStudentCourse() {
       section: 1,
       summary: "",
       published: false,
+      assessmentOpen: false,
       questions: []
     };
 
@@ -878,92 +888,161 @@ async function loadStudentCourse() {
     return null;
   }
 
-  const {
-  data: assessmentRows,
-  error: assessmentError
-} = await supabaseClient.rpc(
-  "get_learning_assessment_options",
-  {
-    p_course_id: course.id
-  }
-);
 
-if (assessmentError) {
-  console.error(
-    "Unable to load assessment options:",
-    assessmentError
-  );
+  /*
+   * -------------------------------------------------
+   * Assessment questions
+   * -------------------------------------------------
+   *
+   * Do NOT request questions unless the
+   * administrator opened the assessment.
+   */
 
-  throw new Error(
-    "Unable to load the assessment."
-  );
-}
+  let studentQuestions = [];
 
-const questionMap = new Map();
 
-for (const row of assessmentRows || []) {
-  if (!questionMap.has(row.question_id)) {
-    questionMap.set(
-      row.question_id,
+  if (course.assessment_open === true) {
+
+    const {
+      data: assessmentRows,
+      error: assessmentError
+    } = await supabaseClient.rpc(
+      "get_learning_assessment_options",
       {
-        id: row.question_id,
-        text: row.question_text,
-        sortOrder:
-          row.question_sort_order || 0,
-        answers: []
+        p_course_id: course.id
       }
     );
+
+
+    if (assessmentError) {
+
+      console.error(
+        "Unable to load assessment options:",
+        assessmentError
+      );
+
+      throw new Error(
+        "Unable to load the assessment."
+      );
+    }
+
+
+    const questionMap =
+      new Map();
+
+
+    for (
+      const row of assessmentRows || []
+    ) {
+
+      if (
+        !questionMap.has(
+          row.question_id
+        )
+      ) {
+
+        questionMap.set(
+          row.question_id,
+          {
+            id: row.question_id,
+
+            text:
+              row.question_text,
+
+            sortOrder:
+              row.question_sort_order || 0,
+
+            answers: []
+          }
+        );
+      }
+
+
+      questionMap
+        .get(row.question_id)
+        .answers.push({
+          id: row.answer_id,
+
+          text:
+            row.answer_text,
+
+          sortOrder:
+            row.answer_sort_order || 0
+        });
+    }
+
+
+    studentQuestions =
+      Array.from(
+        questionMap.values()
+      )
+        .sort(
+          (a, b) =>
+            a.sortOrder -
+            b.sortOrder
+        )
+        .map(
+          question => ({
+            id: question.id,
+
+            text:
+              question.text,
+
+            answers:
+              question.answers
+                .sort(
+                  (a, b) =>
+                    a.sortOrder -
+                    b.sortOrder
+                )
+                .map(
+                  answer => ({
+                    id: answer.id,
+                    text: answer.text
+                  })
+                )
+          })
+        );
   }
 
-  questionMap
-    .get(row.question_id)
-    .answers.push({
-      id: row.answer_id,
-      text: row.answer_text,
-      sortOrder:
-        row.answer_sort_order || 0
-    });
-}
 
-const studentQuestions =
-  Array.from(
-    questionMap.values()
-  )
-    .sort(
-      (a, b) =>
-        a.sortOrder -
-        b.sortOrder
-    )
-    .map(question => ({
-      id: question.id,
-      text: question.text,
-
-      answers:
-        question.answers
-          .sort(
-            (a, b) =>
-              a.sortOrder -
-              b.sortOrder
-          )
-          .map(answer => ({
-            id: answer.id,
-            text: answer.text
-          }))
-    }));
-
+  /*
+   * Save course in student state.
+   */
   state.course = {
-    id: course.id,
-    title: course.title,
-    subtitle: course.subtitle || "",
-    description: course.description || "",
-    section: course.section_number || 1,
-    summary: course.summary || "",
-    published: course.published === true,
-    questions: studentQuestions
+
+    id:
+      course.id,
+
+    title:
+      course.title,
+
+    subtitle:
+      course.subtitle || "",
+
+    description:
+      course.description || "",
+
+    section:
+      course.section_number || 1,
+
+    summary:
+      course.summary || "",
+
+    published:
+      course.published === true,
+
+    assessmentOpen:
+      course.assessment_open === true,
+
+    questions:
+      studentQuestions
   };
+
 
   state.courseClosed =
     course.closed === true;
+
 
   return state.course;
 }
@@ -1241,7 +1320,48 @@ await loadAdminCourse();
 }
 function showStudentView(id){$$("#studentApp .app-view").forEach(v=>v.classList.add("hidden"));$(id).classList.remove("hidden");$$("[data-student-view]").forEach(b=>b.classList.toggle("active",b.dataset.studentView===id))}
 function showAdminView(id){$$("#adminApp .app-view").forEach(v=>v.classList.add("hidden"));$(id).classList.remove("hidden");$$("[data-admin-view]").forEach(b=>b.classList.toggle("active",b.dataset.adminView===id))}
-$$("[data-student-view]").forEach(b=>b.onclick=()=>showStudentView(b.dataset.studentView));$$("[data-admin-view]").forEach(b=>b.onclick=()=>showAdminView(b.dataset.adminView));$$("[data-student-jump]").forEach(b=>b.onclick=()=>showStudentView(b.dataset.studentJump));$$("[data-admin-jump]").forEach(b=>b.onclick=()=>showAdminView(b.dataset.adminJump));
+$$("[data-student-view]").forEach(
+  button => {
+
+    button.onclick = async () => {
+
+      const view =
+        button.dataset.studentView;
+
+      /*
+       * Whenever the student opens
+       * the Course page, check Supabase
+       * for the newest available course.
+       */
+      if (view === "studentCourse") {
+
+        try {
+
+          await loadStudentCourse();
+
+          await loadStudentProgress();
+
+          renderStudent();
+
+        } catch (error) {
+
+          console.error(
+            "Course refresh failed:",
+            error
+          );
+
+          alert(
+            error?.message ||
+            "Unable to check for available courses."
+          );
+        }
+      }
+
+      showStudentView(view);
+    };
+  }
+);
+$$("[data-admin-view]").forEach(b=>b.onclick=()=>showAdminView(b.dataset.adminView));$$("[data-student-jump]").forEach(b=>b.onclick=()=>showStudentView(b.dataset.studentJump));$$("[data-admin-jump]").forEach(b=>b.onclick=()=>showAdminView(b.dataset.adminJump));
 $("studentMenuBtn").onclick=()=>document.querySelector("#studentApp .sidebar").classList.toggle("open");$("adminMenuBtn").onclick=()=>document.querySelector("#adminApp .sidebar").classList.toggle("open");
 
 function bestScore(s){const a=s.progress?.[state.course.id]?.attempts||[];return a.length?Math.max(...a.map(x=>x.score)):null}
@@ -1262,117 +1382,91 @@ function nextCertificateCode(){
  state.certificateSequence[year]=(state.certificateSequence[year]||0)+1;
  return `MIP-${year}-${String(state.certificateSequence[year]).padStart(5,"0")}`;
 }
-function renderAssessment(s){const attempts=s.progress?.[state.course.id]?.attempts||[],disabled=attempts.length>=2;$("assessmentForm").innerHTML=state.course.questions.map((q,qi)=>`<div class="question-card"><h4>${qi+1}. ${esc(q.text)}</h4>${q.answers.map((a,ai)=>`<label class="option"><input type="checkbox" name="${q.id}" value="${a.id}" ${disabled?"disabled":""}><span>${esc(a.text)}</span></label>`).join("")}</div>`).join("");$("submitAssessmentBtn").disabled=disabled;$("submitAssessmentBtn").textContent=disabled?"No attempts remaining":"Submit Assessment"}
-$("submitAssessmentBtn").onclick = async () => {
-  const btn = $("submitAssessmentBtn");
-  const msg = $("assessmentMessage");
+function renderAssessment(s) {
 
-  msg.className = "form-message";
-  msg.textContent = "";
+  /*
+   * Assessment has not started.
+   */
+  if (!state.course.assessmentOpen) {
 
-  if (!state.course?.id) {
-    msg.className = "form-message error";
-    msg.textContent =
-      "No course is currently available.";
+    $("assessmentForm").innerHTML = `
+      <div class="locked-card">
+        <i class="fa-solid fa-lock"></i>
+
+        <h3>Assessment Locked</h3>
+
+        <p>
+          The assessment has not started yet.
+          Continue studying the course summary
+          and wait for your facilitator to open
+          the assessment.
+        </p>
+      </div>
+    `;
+
+    $("submitAssessmentBtn").disabled =
+      true;
+
+    $("submitAssessmentBtn").textContent =
+      "Assessment Locked";
+
     return;
   }
 
-  const selectedAnswerIds = [];
 
-  for (const question of state.course.questions) {
-    const selected = document.querySelector(
-      `input[name="${question.id}"]:checked`
-    );
+  const attempts =
+    s.progress?.[state.course.id]?.attempts ||
+    [];
 
-    if (!selected) {
-      msg.className =
-        "form-message error";
+  const disabled =
+    attempts.length >= 2;
 
-      msg.textContent =
-        "Please answer every question.";
 
-      return;
-    }
+  $("assessmentForm").innerHTML =
+    state.course.questions
+      .map(
+        (q, qi) => `
+          <div class="question-card">
 
-    selectedAnswerIds.push(
-      selected.value
-    );
-  }
+            <h4>
+              ${qi + 1}. ${esc(q.text)}
+            </h4>
 
-  const originalText =
-    btn.innerHTML;
+            ${q.answers
+              .map(
+                a => `
+                  <label class="option">
 
-  btn.disabled = true;
+                    <input
+                      type="radio"
+                      name="${q.id}"
+                      value="${a.id}"
+                      ${disabled ? "disabled" : ""}
+                    >
 
-  btn.innerHTML =
-    '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+                    <span>
+                      ${esc(a.text)}
+                    </span>
 
-  try {
-    const {
-      data,
-      error
-    } = await supabaseClient.rpc(
-      "submit_learning_assessment",
-      {
-        p_course_id:
-          state.course.id,
+                  </label>
+                `
+              )
+              .join("")}
 
-        p_answer_ids:
-          selectedAnswerIds
-      }
-    );
+          </div>
+        `
+      )
+      .join("");
 
-    if (error) {
-      throw error;
-    }
 
-    const result =
-      Array.isArray(data)
-        ? data[0]
-        : data;
+  $("submitAssessmentBtn").disabled =
+    disabled;
 
-    if (!result) {
-      throw new Error(
-        "Assessment result was not returned."
-      );
-    }
-
-    msg.className =
-      `form-message ${
-        result.result === "pass"
-          ? "success"
-          : "error"
-      }`;
-
-    if (result.result === "pass") {
-      msg.textContent =
-        `You scored ${result.score}%. PASS.`;
-    } else {
-      msg.textContent =
-        `You scored ${result.score}%. You did not reach 60%.`;
-    }
-
-    await loadStudentProgress();
-    renderStudent();
-
-  } catch (error) {
-    console.error(
-      "Assessment submission failed:",
-      error
-    );
-
-    msg.className =
-      "form-message error";
-
-    msg.textContent =
-      error?.message ||
-      "Unable to submit the assessment.";
-
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalText;
-  }
-};
+  $("submitAssessmentBtn").textContent =
+    disabled
+      ? "No attempts remaining"
+      : "Submit Assessment";
+}
 function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$("studentResultsContent").innerHTML=a.length?a.map(x=>`<article class="result-card"><div class="result-score ${x.result==="fail"?"fail":""}">${x.score}%</div><div><h3>${esc(state.course.title)} • Attempt ${x.attempt}</h3><p>${new Date(x.submittedAt).toLocaleString()}</p></div><div class="result-status ${x.result}">${x.result.toUpperCase()}</div></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-chart-simple"></i><h3>No results yet</h3><p>Complete your assessment to see your marks.</p></div>`}
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
