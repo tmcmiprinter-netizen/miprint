@@ -107,7 +107,36 @@
 <section id="studentApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><span>mi</span> Print <small>Learning</small></div><nav><button class="nav-item active" data-student-view="studentDashboard"><i class="fa-solid fa-house"></i> Dashboard</button><button class="nav-item" data-student-view="studentCourse"><i class="fa-solid fa-book-open"></i> Course</button><button class="nav-item" data-student-view="studentResults"><i class="fa-solid fa-chart-simple"></i> Results</button><button class="nav-item" data-student-view="studentCertificates"><i class="fa-solid fa-award"></i> Certificates</button><button class="nav-item" data-student-view="studentProfile"><i class="fa-solid fa-user"></i> Profile</button></nav><button class="logout-btn" id="studentLogoutBtn"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button></aside>
 <div class="app-content"><div class="mobile-app-top"><div class="side-brand"><span>mi</span> Print <small>Learning</small></div><button id="studentMenuBtn"><i class="fa-solid fa-bars"></i></button></div>
 <section id="studentDashboard" class="app-view"><div class="view-head"><div><span>Student dashboard</span><h2 id="studentWelcome">Welcome</h2></div><div class="status-chip" id="studentApplicationChip">Approved</div></div><div class="dashboard-cards"><article><i class="fa-solid fa-user-check"></i><span>Application</span><strong id="dashApplication">Approved</strong></article><article><i class="fa-solid fa-list-check"></i><span>Assessment</span><strong id="dashProgress">Not started</strong></article><article><i class="fa-solid fa-percent"></i><span>Best mark</span><strong id="dashMark">—</strong></article><article><i class="fa-solid fa-award"></i><span>Certificates</span><strong id="dashCertificates">0</strong></article></div><div class="dashboard-grid"><article class="panel"><span class="panel-kicker">Current course</span><h3 id="dashCourseTitle"></h3><p id="dashCourseDescription"></p><button class="primary-btn" data-student-jump="studentCourse">Open Course</button></article><article class="panel"><span class="panel-kicker">Latest update</span><div id="studentUpdateFeed" class="update-feed"></div></article></div></section>
-<section id="studentCourse" class="app-view hidden"><div class="view-head"><div><span>Learning</span><h2 id="courseTitleStudent"></h2></div><div class="status-chip sky" id="attemptChip"></div></div><div id="courseLocked" class="locked-card hidden"><i class="fa-solid fa-lock"></i><h3>Course access is not available yet</h3><p>Your application must be approved and the administrator must publish the lesson.</p></div><div id="courseContent"><div class="course-banner"><span id="courseSubtitleStudent"></span><h3 id="courseHeadingStudent"></h3><p id="courseDescriptionStudent"></p></div><div id="summarySections" class="summary-sections"></div><div class="assessment-card"><div class="assessment-head"><div><span>Assessment</span><h3>Knowledge Check</h3></div><div id="attemptsRemaining"></div></div><form id="assessmentForm"></form><button id="submitAssessmentBtn" class="primary-btn full">Submit Assessment</button><div id="assessmentMessage" class="form-message"></div></div></div></section>
+<section id="studentCourse" class="app-view hidden"><div class="view-head"><div><span>Learning</span><h2 id="courseTitleStudent"></h2></div><div class="status-chip sky" id="attemptChip"></div></div>
+    <div class="panel">
+    <span class="panel-kicker">
+      Available Courses
+    </span>
+
+    <h3>Choose a course</h3>
+
+    <p>
+      Select a published course below to enrol.
+    </p>
+
+    <div id="availableCoursesList"></div>
+  </div>
+<div class="panel">
+  <span class="panel-kicker">
+    My Courses
+  </span>
+
+  <h3>
+    Enrolled Courses
+  </h3>
+
+  <p>
+    Courses you have enrolled in will appear here.
+  </p>
+
+  <div id="myCoursesList"></div>
+</div>
+<div id="courseLocked" class="locked-card hidden"><i class="fa-solid fa-lock"></i><h3>Course access is not available yet</h3><p>Your application must be approved and the administrator must publish the lesson.</p></div><div id="courseContent"><div class="course-banner"><span id="courseSubtitleStudent"></span><h3 id="courseHeadingStudent"></h3><p id="courseDescriptionStudent"></p></div><div id="summarySections" class="summary-sections"></div><div class="assessment-card"><div class="assessment-head"><div><span>Assessment</span><h3>Knowledge Check</h3></div><div id="attemptsRemaining"></div></div><form id="assessmentForm"></form><button id="submitAssessmentBtn" class="primary-btn full">Submit Assessment</button><div id="assessmentMessage" class="form-message"></div></div></div></section>
 <section id="studentResults" class="app-view hidden"><div class="view-head"><div><span>Progress</span><h2>Your Results</h2></div></div><div id="studentResultsContent"></div></section>
 <section id="studentCertificates" class="app-view hidden"><div class="view-head"><div><span>Awards</span><h2>Your Certificates</h2></div></div><div id="studentCertificateList" class="certificate-list"></div></section>
 <section id="studentProfile" class="app-view hidden"><div class="view-head"><div><span>Student record</span><h2>Profile</h2></div></div><div id="studentProfileCard" class="profile-card"></div></section>

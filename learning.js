@@ -558,75 +558,21 @@ async function loadCurrentStudent(authUserId) {
 
   return student;
 }
-
-async function checkInvitationSession() {
-  try {
-    const {
-      data: { session }
-    } = await supabaseClient.auth.getSession();
-
-    if (!session?.user) {
-      return;
-    }
-
-    const user = session.user;
-
-    // Admins should not see the password setup modal.
-    const {
-      data: isAdmin,
-      error: adminError
-    } = await supabaseClient.rpc(
-      "is_learning_admin"
-    );
-
-    if (!adminError && isAdmin === true) {
-      return;
-    }
-
-    // Check if this authenticated user is an approved student.
-    const {
-      data: student,
-      error
-    } = await supabaseClient
-      .from("learning_students")
-      .select(`
-        id,
-        active,
-        auth_user_id
-      `)
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error(
-        "Invitation student check failed:",
-        error
-      );
-
-      return;
-    }
-
-    if (!student) {
-      return;
-    }
-
-    if (!student.active) {
-      return;
-    }
-
-    // Student is authenticated through the invitation.
-    // Show password creation modal.
-    openModal("setPasswordModal");
-
-  } catch (error) {
-    console.error(
-      "Invitation session check failed:",
-      error
-    );
-  }
-}
+let passwordSetupAllowed = false;
 
 $("setPasswordBtn").onclick = async () => {
+  if (!passwordSetupAllowed) {
+
+  alert(
+    "Password setup session is not valid."
+  );
+
+  closeModal(
+    "setPasswordModal"
+  );
+
+  return;
+}
   const password =
     $("newStudentPassword").value;
 
@@ -712,14 +658,16 @@ $("setPasswordBtn").onclick = async () => {
     $("newStudentPassword").value = "";
     $("confirmStudentPassword").value = "";
 
-    setTimeout(async () => {
-      closeModal(
-        "setPasswordModal"
-      );
+setTimeout(async () => {
+  closeModal(
+    "setPasswordModal"
+  );
 
-      // Sign them out so they can test
-      // the normal student login.
-      await supabaseClient.auth.signOut();
+  passwordSetupAllowed = false;
+
+  // Sign them out so they can test
+  // the normal student login.
+  await supabaseClient.auth.signOut();
 
       openModal("loginModal");
 
@@ -752,13 +700,83 @@ $("setPasswordBtn").onclick = async () => {
 };
 
 supabaseClient.auth.onAuthStateChange(
-  async (event, session) => {
+  async (event, authSession) => {
 
-    if (
-      event === "PASSWORD_RECOVERY" &&
-      session?.user
-    ) {
-      openModal("setPasswordModal");
+    if (!authSession?.user) {
+      return;
+    }
+
+
+if (event === "PASSWORD_RECOVERY") {
+
+  passwordSetupAllowed = true;
+
+  openModal(
+    "setPasswordModal"
+  );
+
+  return;
+}
+
+
+    /*
+     * First-time invitation link.
+     *
+     * Supabase invite redirects can include
+     * type=invite in the URL.
+     */
+    const url =
+      new URL(
+        window.location.href
+      );
+
+    const hashParams =
+      new URLSearchParams(
+        window.location.hash
+          .replace(/^#/, "")
+      );
+
+    const isInvite =
+      url.searchParams.get("type") === "invite" ||
+      hashParams.get("type") === "invite";
+
+
+    if (isInvite) {
+
+  passwordSetupAllowed = true;
+
+  openModal(
+    "setPasswordModal"
+  );
+
+      /*
+       * Remove the invite marker so refreshing
+       * the page does not reopen the modal.
+       */
+      url.searchParams.delete(
+        "type"
+      );
+
+      hashParams.delete(
+        "type"
+      );
+
+
+      const cleanHash =
+        hashParams.toString();
+
+
+      window.history.replaceState(
+        {},
+        document.title,
+        url.pathname +
+        url.search +
+        (
+          cleanHash
+            ? `#${cleanHash}`
+            : ""
+        )
+      );
     }
 
   }
@@ -819,16 +837,69 @@ $("forgotPasswordBtn").onclick = async () => {
 
 function hidePublic(){document.querySelector(".topbar").classList.add("hidden");$("publicLanding").classList.add("hidden")}
 function showPublic(){document.querySelector(".topbar").classList.remove("hidden");$("publicLanding").classList.remove("hidden");$("studentApp").classList.add("hidden");$("adminApp").classList.add("hidden");session=null}
-$("studentLogoutBtn").onclick=showPublic;$("adminLogoutBtn").onclick = async () => {
+$("studentLogoutBtn").onclick = async () => {
+
+  await supabaseClient.auth.signOut();
+
+  session = null;
+
+  showPublic();
+};
+
+$("adminLogoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
   showPublic();
-  checkInvitationSession();
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
-async function loadStudentCourse() {
+async function enrollInCourse(courseId) {
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.rpc(
+      "enroll_learning_course",
+      {
+        p_course_id: courseId
+      }
+    );
 
+    if (error) {
+      throw error;
+    }
+
+    alert(
+  "You have enrolled successfully."
+);
+
+await loadStudentEnrollments();
+
+renderAvailableCourses();
+renderMyCourses();
+
+return data;
+
+  } catch (error) {
+    console.error(
+      "Course enrolment failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to enrol in this course."
+    );
+
+    return null;
+  }
+}
+
+
+window.enrollInCourse =
+  enrollInCourse;
+
+async function loadAvailableCourses() {
   const {
-    data: course,
+    data,
     error
   } = await supabaseClient
     .from("learning_courses")
@@ -841,17 +912,406 @@ async function loadStudentCourse() {
       summary,
       published,
       closed,
-      assessment_open
+      assessment_open,
+      created_at
     `)
     .eq("published", true)
     .eq("closed", false)
     .order("created_at", {
       ascending: false
-    })
-    .limit(1)
-    .maybeSingle();
+    });
+
+  if (error) {
+    console.error(
+      "Unable to load available courses:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load available courses."
+    );
+  }
+
+  state.availableCourses =
+    data || [];
+
+  return state.availableCourses;
+}
+
+async function loadStudentEnrollments() {
+
+  const {
+    data,
+    error
+  } = await supabaseClient.rpc(
+    "get_my_learning_courses"
+  );
+
+  if (error) {
+
+    console.error(
+      "Unable to load student courses:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load your enrolled courses."
+    );
+  }
 
 
+  state.enrollments =
+    (data || []).map(
+      item => ({
+
+        id:
+          item.enrollment_id,
+
+        course_id:
+          item.course_id,
+
+        status:
+          item.enrollment_status,
+
+        enrolled_at:
+          item.enrolled_at,
+
+        completed_at:
+          item.completed_at
+
+      })
+    );
+
+
+  state.myCourses =
+    (data || []).map(
+      item => ({
+
+        id:
+          item.course_id,
+
+        title:
+          item.title,
+
+        subtitle:
+          item.subtitle || "",
+
+        description:
+          item.description || "",
+
+        section:
+          item.section_number || 1,
+
+        summary:
+          item.summary || "",
+
+        published:
+          item.published === true,
+
+        closed:
+          item.closed === true,
+
+        assessmentOpen:
+          item.assessment_open === true,
+
+        enrollmentStatus:
+          item.enrollment_status,
+
+        enrolledAt:
+          item.enrolled_at,
+
+        completedAt:
+          item.completed_at
+
+      })
+    );
+
+
+  return state.enrollments;
+}
+
+function renderAvailableCourses() {
+  const container =
+    $("availableCoursesList");
+
+  if (!container) {
+    return;
+  }
+
+  const courses =
+    state.availableCourses || [];
+
+  const enrollments =
+    state.enrollments || [];
+
+  if (!courses.length) {
+    container.innerHTML = `
+      <div class="locked-card">
+        <i class="fa-solid fa-book"></i>
+
+        <h3>No courses available</h3>
+
+        <p>
+          There are currently no published courses
+          available for enrolment.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    courses.map(course => {
+
+      const enrollment =
+  enrollments.find(
+    item =>
+      item.course_id === course.id &&
+      (
+        item.status === "enrolled" ||
+        item.status === "completed"
+      )
+  );
+
+      return `
+        <article class="course-card">
+
+          <h3>
+            ${esc(course.title)}
+          </h3>
+
+          <p>
+            ${esc(
+              course.description || ""
+            )}
+          </p>
+
+          ${
+  enrollment
+    ? `
+      <button
+        class="ghost-btn"
+        type="button"
+        disabled
+      >
+        <i class="fa-solid fa-check"></i>
+        ${
+          enrollment.status === "completed"
+            ? "Completed"
+            : "Enrolled"
+        }
+      </button>
+    `
+    : `
+      <button
+        class="primary-btn"
+        type="button"
+        onclick="enrollInCourse('${course.id}')"
+      >
+        Enrol
+      </button>
+    `
+}
+
+        </article>
+      `;
+    }).join("");
+}
+
+function renderMyCourses() {
+  const container =
+    $("myCoursesList");
+
+  if (!container) {
+    return;
+  }
+
+  const courses =
+  state.myCourses || [];
+
+  const enrollments =
+    state.enrollments || [];
+
+const enrolledCourses =
+  courses;
+
+  if (!enrolledCourses.length) {
+    container.innerHTML = `
+      <div class="locked-card">
+        <i class="fa-solid fa-book-open"></i>
+
+        <h3>No enrolled courses</h3>
+
+        <p>
+          Enrol in an available course and it
+          will appear here.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    enrolledCourses.map(course => `
+      <article class="course-card">
+
+        <h3>
+          ${esc(course.title)}
+        </h3>
+
+        <p>
+          ${esc(course.description || "")}
+        </p>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+
+<span class="status-chip">
+  ${
+    enrollments.find(
+      enrollment =>
+        enrollment.course_id === course.id
+    )?.status === "completed"
+      ? "Completed"
+      : "Enrolled"
+  }
+</span>
+
+  <button
+    class="primary-btn"
+    type="button"
+    onclick="openEnrolledCourse('${course.id}')"
+  >
+    Open Course
+  </button>
+
+</div>
+
+      </article>
+    `).join("");
+}
+
+async function openEnrolledCourse(courseId) {
+  try {
+
+    const enrollment =
+  (state.enrollments || [])
+    .find(
+      item =>
+        item.course_id === courseId &&
+        (
+          item.status === "enrolled" ||
+          item.status === "completed"
+        )
+    );
+
+    if (!enrollment) {
+      alert(
+        "You are not enrolled in this course."
+      );
+
+      return;
+    }
+
+    await loadStudentCourse(
+      courseId
+    );
+
+    await loadStudentProgress();
+
+    renderStudent();
+
+    showStudentView(
+      "studentCourse"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Unable to open enrolled course:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to open this course."
+    );
+  }
+}
+
+
+window.openEnrolledCourse =
+  openEnrolledCourse;
+
+async function loadStudentCourse(
+  courseId = null
+) {
+
+  let course = null;
+let error = null;
+
+
+/*
+ * If a specific enrolled course
+ * was selected, load it through
+ * the secure student RPC.
+ */
+if (courseId) {
+
+  const result =
+    await supabaseClient.rpc(
+      "get_my_learning_course",
+      {
+        p_course_id: courseId
+      }
+    );
+
+  error =
+    result.error;
+
+  course =
+    result.data?.[0] || null;
+
+}
+
+
+/*
+ * This fallback is only for cases
+ * where no specific course ID was
+ * supplied.
+ */
+else {
+
+  const result =
+    await supabaseClient
+      .from("learning_courses")
+      .select(`
+        id,
+        title,
+        subtitle,
+        description,
+        section_number,
+        summary,
+        published,
+        closed,
+        assessment_open
+      `)
+      .eq("published", true)
+      .eq("closed", false)
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(1)
+      .maybeSingle();
+
+  course =
+    result.data;
+
+  error =
+    result.error;
+
+}
   if (error) {
 
     console.error(
@@ -900,8 +1360,21 @@ async function loadStudentCourse() {
 
   let studentQuestions = [];
 
+  const courseEnrollment =
+  (state.enrollments || [])
+    .find(
+      enrollment =>
+        enrollment.course_id === course.id
+    );
 
-  if (course.assessment_open === true) {
+const canWriteAssessment =
+  courseEnrollment?.status === "enrolled";
+
+
+  if (
+  course.assessment_open === true &&
+  canWriteAssessment
+) {
 
     const {
       data: assessmentRows,
@@ -1085,21 +1558,11 @@ async function loadStudentProgress() {
   }
 
   const {
-    data: certificates,
-    error: certificatesError
-  } = await supabaseClient
-    .from("learning_certificates")
-    .select(`
-      id,
-      course_id,
-      certificate_number,
-      score,
-      awarded_at
-    `)
-    .eq("student_id", student.id)
-    .order("awarded_at", {
-      ascending: false
-    });
+  data: certificates,
+  error: certificatesError
+} = await supabaseClient.rpc(
+  "get_my_learning_certificates"
+);
 
   if (certificatesError) {
     console.error(
@@ -1132,28 +1595,51 @@ async function loadStudentProgress() {
     });
   }
 
-  student.certificates =
-    (certificates || []).map(
-      certificate => ({
-        id: certificate.id,
-        courseId:
-          certificate.course_id,
-        number:
-          certificate.certificate_number,
-        score:
-          certificate.score,
-        awardedAt:
-          certificate.awarded_at
-      })
-    );
+student.certificates =
+  (certificates || []).map(
+    certificate => ({
+      id:
+        certificate.id,
+
+      courseId:
+        certificate.course_id,
+
+      courseTitle:
+        certificate.course_title,
+
+      certificateCode:
+        certificate.certificate_number,
+
+      score:
+        certificate.score,
+
+      awardedAt:
+        certificate.awarded_at
+    })
+  );
 }
 
 async function showStudent() {
   try {
-    await loadStudentCourse();
-    await loadStudentProgress();
+await loadAvailableCourses();
+await loadStudentEnrollments();
 
-    hidePublic();
+state.course = {
+  id: null,
+  title: "Choose a course",
+  subtitle: "",
+  description:
+    "Open one of your enrolled courses below.",
+  section: 1,
+  summary: "",
+  published: false,
+  assessmentOpen: false,
+  questions: []
+};
+
+state.courseClosed = true;
+
+await loadStudentProgress();
 
     hidePublic();
 
@@ -1164,6 +1650,8 @@ async function showStudent() {
       .classList.add("hidden");
 
     renderStudent();
+    renderAvailableCourses();
+    renderMyCourses();
 
     showStudentView(
       "studentDashboard"
@@ -1333,30 +1821,35 @@ $$("[data-student-view]").forEach(
         button.dataset.studentView;
 
       /*
-       * Whenever the student opens
-       * the Course page, check Supabase
-       * for the newest available course.
+       * When the Course page opens,
+       * refresh the available and
+       * enrolled course lists.
+       *
+       * Do NOT automatically select
+       * another course.
        */
       if (view === "studentCourse") {
 
         try {
 
-          await loadStudentCourse();
+          await loadAvailableCourses();
 
-          await loadStudentProgress();
+          await loadStudentEnrollments();
 
-          renderStudent();
+          renderAvailableCourses();
+
+          renderMyCourses();
 
         } catch (error) {
 
           console.error(
-            "Course refresh failed:",
+            "Course list refresh failed:",
             error
           );
 
           alert(
             error?.message ||
-            "Unable to check for available courses."
+            "Unable to refresh your courses."
           );
         }
       }
@@ -1371,12 +1864,78 @@ $("studentMenuBtn").onclick=()=>document.querySelector("#studentApp .sidebar").c
 function bestScore(s){const a=s.progress?.[state.course.id]?.attempts||[];return a.length?Math.max(...a.map(x=>x.score)):null}
 function hasCert(s){return (s.certificates||[]).some(c=>c.courseId===state.course.id)}
 function renderStudent(){
- const s=currentStudent(),p=s.progress?.[state.course.id]||{attempts:[]},best=bestScore(s);
+
+ const s = currentStudent();
+
+ const courseSelected =
+   !!state.course?.id;
+
+ const p =
+   courseSelected
+     ? s.progress?.[state.course.id] || {
+         attempts: []
+       }
+     : {
+         attempts: []
+       };
+
+ const best =
+   courseSelected
+     ? bestScore(s)
+     : null;
  $("studentWelcome").textContent=`Welcome, ${s.fullName.split(" ")[0]}`;$("dashProgress").textContent=p.attempts.length?`${p.attempts.length}/2 attempts used`:"Not started";$("dashMark").textContent=best===null?"—":`${best}%`;$("dashCertificates").textContent=(s.certificates||[]).length;
  ["dashCourseTitle","courseTitleStudent","courseHeadingStudent"].forEach(id=>$(id).textContent=state.course.title);$("dashCourseDescription").textContent=state.course.description;$("courseSubtitleStudent").textContent=state.course.subtitle;$("courseDescriptionStudent").textContent=state.course.description;
- const left=Math.max(0,2-p.attempts.length);$("attemptChip").textContent=`${left} attempts available`;$("attemptsRemaining").textContent=`${left} attempts remaining`;
- const allowed=state.course.published&&!state.courseClosed&&s.active;$("courseLocked").classList.toggle("hidden",allowed);$("courseContent").classList.toggle("hidden",!allowed);
- $("summarySections").innerHTML=`<article class="summary-card"><h4>Section ${state.course.section}: ${esc(state.course.title)}</h4><p>${esc(state.course.summary)}</p></article>`;
+const left =
+  courseSelected
+    ? Math.max(
+        0,
+        2 - p.attempts.length
+      )
+    : 0;
+
+$("attemptChip").textContent =
+  courseSelected
+    ? `${left} attempts available`
+    : "Choose a course";
+
+$("attemptsRemaining").textContent =
+  courseSelected
+    ? `${left} attempts remaining`
+    : "Choose a course first"; 
+    
+const enrollment =
+  (state.enrollments || [])
+    .find(
+      item =>
+        item.course_id === state.course?.id
+    );
+
+const completedCourse =
+  enrollment?.status === "completed";
+
+const allowed =
+  s.active &&
+  (
+    (
+      state.course.published &&
+      !state.courseClosed
+    ) ||
+    completedCourse
+  );
+
+$("courseLocked")
+  .classList.toggle(
+    "hidden",
+    allowed
+  );
+
+$("courseContent")
+  .classList.toggle(
+    "hidden",
+    !allowed
+  );
+  
+  $("summarySections").innerHTML=`<article class="summary-card"><h4>Section ${state.course.section}: ${esc(state.course.title)}</h4><p>${esc(state.course.summary)}</p></article>`;
  renderAssessment(s);renderResults(s);renderCerts(s);renderProfile(s);
  $("studentUpdateFeed").innerHTML=`<div class="update-item"><strong>Application approved</strong><span>Your student account is active.</span></div><div class="update-item"><strong>${state.course.published?"Course published":"Course hidden"}</strong><span>${esc(state.course.title)}</span></div>${best!==null?`<div class="update-item"><strong>Best mark: ${best}%</strong><span>${best>=60?"Pass":"Not yet passed"}</span></div>`:""}`
 }
@@ -1471,7 +2030,120 @@ function renderAssessment(s) {
       ? "No attempts remaining"
       : "Submit Assessment";
 }
-function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$("studentResultsContent").innerHTML=a.length?a.map(x=>`<article class="result-card"><div class="result-score ${x.result==="fail"?"fail":""}">${x.score}%</div><div><h3>${esc(state.course.title)} • Attempt ${x.attempt}</h3><p>${new Date(x.submittedAt).toLocaleString()}</p></div><div class="result-status ${x.result}">${x.result.toUpperCase()}</div></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-chart-simple"></i><h3>No results yet</h3><p>Complete your assessment to see your marks.</p></div>`}
+function renderResults(s) {
+
+  const allResults = [];
+
+
+  Object.entries(
+    s.progress || {}
+  ).forEach(
+    ([courseId, progress]) => {
+
+      const course =
+        (state.myCourses || [])
+          .find(
+            item =>
+              item.id === courseId
+          ) ||
+
+        (state.availableCourses || [])
+          .find(
+            item =>
+              item.id === courseId
+          ) ||
+
+        (
+          state.course?.id === courseId
+            ? state.course
+            : null
+        );
+
+
+      const courseTitle =
+        course?.title ||
+        "Course";
+
+
+      (progress.attempts || [])
+        .forEach(
+          attempt => {
+
+            allResults.push({
+              ...attempt,
+              courseId,
+              courseTitle
+            });
+
+          }
+        );
+    }
+  );
+
+
+  allResults.sort(
+    (a, b) =>
+      new Date(b.submittedAt) -
+      new Date(a.submittedAt)
+  );
+
+
+  $("studentResultsContent").innerHTML =
+    allResults.length
+
+      ? allResults.map(
+          result => `
+
+            <article class="result-card">
+
+              <div class="result-score ${
+                result.result === "fail"
+                  ? "fail"
+                  : ""
+              }">
+                ${result.score}%
+              </div>
+
+              <div>
+                <h3>
+                  ${esc(result.courseTitle)}
+                  • Attempt ${result.attemptNumber}
+                </h3>
+
+                <p>
+                  ${
+                    new Date(
+                      result.submittedAt
+                    ).toLocaleString()
+                  }
+                </p>
+              </div>
+
+              <div class="result-status ${result.result}">
+                ${result.result.toUpperCase()}
+              </div>
+
+            </article>
+
+          `
+        ).join("")
+
+      : `
+        <div class="locked-card">
+
+          <i class="fa-solid fa-chart-simple"></i>
+
+          <h3>
+            No results yet
+          </h3>
+
+          <p>
+            Complete an assessment to see your marks.
+          </p>
+
+        </div>
+      `;
+}
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
 
@@ -2450,4 +3122,107 @@ $("closeCourseBtn").onclick = async () => {
 function renderAdminCerts(){const all=state.students.flatMap(s=>(s.certificates||[]).map(c=>({s,c})));$("certificateAdminList").innerHTML=all.length?all.map(({s,c})=>`<article class="certificate-card"><h3>${esc(s.fullName)}</h3><p><strong>${esc(c.certificateCode||"Pending code")}</strong> • ${esc(c.courseTitle)} • ${c.score}% • ${new Date(c.awardedAt).toLocaleDateString()}</p><button class="primary-btn" onclick="openCertificate('${s.id}','${c.id}')">Print / Save PDF</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3></div>`}
 window.openCertificate=(sid,cid)=>{const s=state.students.find(x=>x.id===sid),c=s?.certificates?.find(x=>x.id===cid);if(!s||!c)return;$("certificatePreview").innerHTML=`<div class="certificate-sheet"><div class="cert-brand"><span>mi</span> Print Learning</div><h2>Certificate of Completion</h2><p>This certificate is proudly awarded to</p><div class="student-name">${esc(s.fullName)}</div><p>Certificate No. <strong>${esc(c.certificateCode||"MIP-LEGACY")}</strong></p><p>for successfully completing</p><div class="cert-course">${esc(c.courseTitle)}</div><p>with a final recorded score of <strong>${c.score}%</strong>.</p><div class="cert-footer"><span>Awarded: ${new Date(c.awardedAt).toLocaleDateString()}</span><span>mi Print • Tiangmaatla Multipurpose</span></div></div>`;openModal("certificateModal")};
 $("printCertificateBtn").onclick=()=>window.print();
-showPublic();
+async function restoreLearningSession() {
+
+  try {
+
+    const {
+      data,
+      error
+    } = await supabaseClient.auth.getSession();
+
+    if (error) {
+      throw error;
+    }
+
+
+    const authSession =
+      data?.session;
+
+    const user =
+      authSession?.user;
+
+
+    if (!user) {
+      showPublic();
+      return;
+    }
+
+
+    /*
+     * Check whether the logged-in
+     * account is an administrator.
+     */
+    const {
+      data: isAdmin,
+      error: adminCheckError
+    } = await supabaseClient.rpc(
+      "is_learning_admin"
+    );
+
+
+    if (adminCheckError) {
+      throw adminCheckError;
+    }
+
+
+    if (isAdmin === true) {
+
+      session = {
+        role: "admin",
+        authUserId: user.id
+      };
+
+      await showAdmin();
+
+      return;
+    }
+
+
+    /*
+     * Otherwise check for an
+     * active student account.
+     */
+    const student =
+      await loadCurrentStudent(
+        user.id
+      );
+
+
+    if (
+      !student ||
+      !student.active
+    ) {
+
+      await supabaseClient.auth.signOut();
+
+      showPublic();
+
+      return;
+    }
+
+
+    session = {
+      role: "student",
+      studentId: student.id,
+      authUserId: user.id
+    };
+
+
+    await showStudent();
+
+  } catch (error) {
+
+    console.error(
+      "Session restoration failed:",
+      error
+    );
+
+    session = null;
+
+    showPublic();
+  }
+}
+
+
+restoreLearningSession();
