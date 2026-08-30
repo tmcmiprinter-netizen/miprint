@@ -1475,12 +1475,81 @@ function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$(
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
 
-$("toggleAssessmentBtn").textContent =
-  state.course.assessmentOpen
-    ? "Close Assessment"
-    : "Open Assessment";
 
-function renderAdmin(){const pending=state.applications.filter(a=>a.status==="pending"),approved=state.students.filter(s=>s.active),certs=state.students.flatMap(s=>s.certificates||[]),ranked=approved.map(s=>({s,score:bestScore(s)})).filter(x=>x.score!==null).sort((a,b)=>b.score-a.score);$("adminPendingCount").textContent=pending.length;$("adminApprovedCount").textContent=approved.length;$("adminTopStudent").textContent=ranked.length?`${ranked[0].s.fullName.split(" ")[0]} ${ranked[0].score}%`:"—";$("adminCertificateCount").textContent=certs.length;$("adminCurrentCourse").textContent=state.course.title;$("adminCurrentCourseState").textContent=state.courseClosed?"Course session is closed.":state.course.published?"Course is published for approved students.":"Course is hidden from students.";renderApplications();renderStudents();renderBuilder();renderAdminCerts();$("togglePublishBtn").textContent=state.course.published?"Hide Course":"Publish Course"}
+function renderAdmin() {
+  const pending =
+    state.applications.filter(
+      a => a.status === "pending"
+    );
+
+  const approved =
+    state.students.filter(
+      s => s.active
+    );
+
+  const certs =
+    state.students.flatMap(
+      s => s.certificates || []
+    );
+
+  const ranked =
+    approved
+      .map(s => ({
+        s,
+        score: bestScore(s)
+      }))
+      .filter(x => x.score !== null)
+      .sort(
+        (a, b) =>
+          b.score - a.score
+      );
+
+
+  $("adminPendingCount").textContent =
+    pending.length;
+
+  $("adminApprovedCount").textContent =
+    approved.length;
+
+  $("adminTopStudent").textContent =
+    ranked.length
+      ? `${ranked[0].s.fullName.split(" ")[0]} ${ranked[0].score}%`
+      : "—";
+
+  $("adminCertificateCount").textContent =
+    certs.length;
+
+
+  $("adminCurrentCourse").textContent =
+    state.course.title;
+
+
+  $("adminCurrentCourseState").textContent =
+    state.courseClosed
+      ? "Course session is closed."
+      : state.course.published
+        ? "Course is published for approved students."
+        : "Course is hidden from students.";
+
+
+  renderApplications();
+  renderStudents();
+  renderBuilder();
+  renderAdminCerts();
+
+
+  $("togglePublishBtn").textContent =
+    state.course.published
+      ? "Hide Course"
+      : "Publish Course";
+
+
+  $("toggleAssessmentBtn").textContent =
+    state.course.assessmentOpen
+      ? "Close Assessment"
+      : "Open Assessment";
+}
+
 function renderApplications() {
   $("applicationsTable").innerHTML =
     state.applications.length
