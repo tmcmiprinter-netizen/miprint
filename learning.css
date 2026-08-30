@@ -1317,3 +1317,34 @@ footer p {
 .miprinter-admin-error span{margin-top:7px;font-size:.78rem}
 @media(max-width:900px){.miprinter-admin-hero{align-items:flex-start;flex-direction:column}.miprinter-admin-stats{grid-template-columns:1fr}.miprinter-job{grid-template-columns:auto 1fr}.miprinter-job-actions{grid-column:1/-1;justify-content:flex-start;padding-left:72px}}
 @media(max-width:600px){.miprinter-admin-view{padding:20px 14px 40px}.miprinter-admin-topbar{align-items:flex-start;flex-direction:column;margin-bottom:30px}.miprinter-admin-actions-top{width:100%}.miprinter-admin-actions-top>*{flex:1}.miprinter-job{grid-template-columns:1fr}.miprinter-job-icon{display:none}.miprinter-job-actions{padding-left:0}.miprinter-job-actions button{flex:1;justify-content:center}}
+
+
+/* Forgot password button */
+#forgotPasswordBtn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+
+  background: #f3f6f8;
+  color: #192433;
+
+  border: 1px solid #d9e1e5;
+  border-radius: 10px;
+
+  padding: 13px 16px;
+
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  opacity: 1;
+  visibility: visible;
+}
+
+#forgotPasswordBtn:hover {
+  background: #e8eef1;
+  color: #192433;
+  border-color: #c8d3d9;
+}
