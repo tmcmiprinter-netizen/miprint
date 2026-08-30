@@ -561,21 +561,68 @@ async function loadCurrentStudent(authUserId) {
 
 async function checkInvitationSession() {
   try {
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const queryParams = new URLSearchParams(window.location.search);
-    const flowType = hashParams.get("type") || queryParams.get("type");
+    const {
+      data: { session }
+    } = await supabaseClient.auth.getSession();
 
-    if (flowType !== "invite" && flowType !== "recovery") {
+    if (!session?.user) {
       return;
     }
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const user = session.user;
 
-    if (session?.user) {
-      openModal("setPasswordModal");
+    // Admins should not see the password setup modal.
+    const {
+      data: isAdmin,
+      error: adminError
+    } = await supabaseClient.rpc(
+      "is_learning_admin"
+    );
+
+    if (!adminError && isAdmin === true) {
+      return;
     }
+
+    // Check if this authenticated user is an approved student.
+    const {
+      data: student,
+      error
+    } = await supabaseClient
+      .from("learning_students")
+      .select(`
+        id,
+        active,
+        auth_user_id
+      `)
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Invitation student check failed:",
+        error
+      );
+
+      return;
+    }
+
+    if (!student) {
+      return;
+    }
+
+    if (!student.active) {
+      return;
+    }
+
+    // Student is authenticated through the invitation.
+    // Show password creation modal.
+    openModal("setPasswordModal");
+
   } catch (error) {
-    console.error("Invitation session check failed:", error);
+    console.error(
+      "Invitation session check failed:",
+      error
+    );
   }
 }
 
@@ -772,14 +819,10 @@ $("forgotPasswordBtn").onclick = async () => {
 
 function hidePublic(){document.querySelector(".topbar").classList.add("hidden");$("publicLanding").classList.add("hidden")}
 function showPublic(){document.querySelector(".topbar").classList.remove("hidden");$("publicLanding").classList.remove("hidden");$("studentApp").classList.add("hidden");$("adminApp").classList.add("hidden");session=null}
-$("studentLogoutBtn").onclick = async () => {
+$("studentLogoutBtn").onclick=showPublic;$("adminLogoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
   showPublic();
-};
-
-$("adminLogoutBtn").onclick = async () => {
-  await supabaseClient.auth.signOut();
-  showPublic();
+  checkInvitationSession();
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
 async function loadStudentCourse() {
@@ -1080,7 +1123,7 @@ async function loadStudentProgress() {
       attempt.course_id
     ].attempts.push({
       id: attempt.id,
-      attempt:
+      attemptNumber:
         attempt.attempt_number,
       score: attempt.score,
       result: attempt.result,
@@ -1095,12 +1138,8 @@ async function loadStudentProgress() {
         id: certificate.id,
         courseId:
           certificate.course_id,
-        certificateCode:
+        number:
           certificate.certificate_number,
-        courseTitle:
-          certificate.course_id === state.course?.id
-            ? state.course.title
-            : "Learning Course",
         score:
           certificate.score,
         awardedAt:
@@ -1113,6 +1152,8 @@ async function showStudent() {
   try {
     await loadStudentCourse();
     await loadStudentProgress();
+
+    hidePublic();
 
     hidePublic();
 
@@ -1160,7 +1201,6 @@ async function loadAdminCourse() {
       created_at,
       updated_at
     `)
-    .eq("closed", false)
     .order("created_at", {
       ascending: false
     })
@@ -1179,39 +1219,7 @@ async function loadAdminCourse() {
   }
 
   if (!data) {
-    const { data: newCourse, error: createError } = await supabaseClient
-      .from("learning_courses")
-      .insert({
-        title: "New Course",
-        subtitle: "",
-        description: "",
-        section_number: 1,
-        summary: "",
-        published: false,
-        closed: false,
-        assessment_open: false
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      throw createError;
-    }
-
-    state.course = {
-      id: newCourse.id,
-      title: newCourse.title,
-      subtitle: "",
-      description: "",
-      section: 1,
-      summary: "",
-      published: false,
-      assessmentOpen: false,
-      questions: []
-    };
-
-    state.courseClosed = false;
-    return state.course;
+    return null;
   }
 
   const {
@@ -1463,75 +1471,6 @@ function renderAssessment(s) {
       ? "No attempts remaining"
       : "Submit Assessment";
 }
-$("submitAssessmentBtn").onclick = async () => {
-  const btn = $("submitAssessmentBtn");
-  const msg = $("assessmentMessage");
-
-  msg.className = "form-message";
-  msg.textContent = "";
-
-  if (!state.course?.id || !state.course.assessmentOpen) {
-    msg.className = "form-message error";
-    msg.textContent = "The assessment is not open.";
-    return;
-  }
-
-  const selectedAnswerIds = [];
-
-  for (const question of state.course.questions) {
-    const selected = document.querySelector(
-      `input[name="${question.id}"]:checked`
-    );
-
-    if (!selected) {
-      msg.className = "form-message error";
-      msg.textContent = "Please answer every question.";
-      return;
-    }
-
-    selectedAnswerIds.push(selected.value);
-  }
-
-  const originalText = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
-
-  try {
-    const { data, error } = await supabaseClient.rpc(
-      "submit_learning_assessment",
-      {
-        p_course_id: state.course.id,
-        p_answer_ids: selectedAnswerIds
-      }
-    );
-
-    if (error) throw error;
-
-    const result = Array.isArray(data) ? data[0] : data;
-
-    if (!result) {
-      throw new Error("Assessment result was not returned.");
-    }
-
-    msg.className = `form-message ${result.result === "pass" ? "success" : "error"}`;
-    msg.textContent = result.result === "pass"
-      ? `You scored ${result.score}%. PASS.`
-      : `You scored ${result.score}%. You did not reach 60%.`;
-
-    await loadStudentProgress();
-    renderStudent();
-    showStudentView("studentResults");
-
-  } catch (error) {
-    console.error("Assessment submission failed:", error);
-    msg.className = "form-message error";
-    msg.textContent = error?.message || "Unable to submit the assessment.";
-
-  } finally {
-    btn.disabled = false;
-  }
-};
-
 function renderResults(s){const a=s.progress?.[state.course.id]?.attempts||[];$("studentResultsContent").innerHTML=a.length?a.map(x=>`<article class="result-card"><div class="result-score ${x.result==="fail"?"fail":""}">${x.score}%</div><div><h3>${esc(state.course.title)} • Attempt ${x.attempt}</h3><p>${new Date(x.submittedAt).toLocaleString()}</p></div><div class="result-status ${x.result}">${x.result.toUpperCase()}</div></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-chart-simple"></i><h3>No results yet</h3><p>Complete your assessment to see your marks.</p></div>`}
 function renderCerts(s){const c=s.certificates||[];$("studentCertificateList").innerHTML=c.length?c.map(x=>`<article class="certificate-card"><h3>${esc(x.courseTitle)}</h3><p>${new Date(x.awardedAt).toLocaleDateString()} • ${x.score}%</p><button class="primary-btn" onclick="openCertificate('${s.id}','${x.id}')">View Certificate</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3><p>Pass a course to receive a certificate.</p></div>`}
 function renderProfile(s){const rows=[["Full name",s.fullName],["Email",s.email],["Phone",s.phone],["Nationality",s.nationality],["Identity / Passport","••••••"+String(s.identity).slice(-4)],["Year of birth",s.birthYear],["Education",s.education],["Current status",s.currentStatus],["Application","Approved"],["Document",s.documentName]];$("studentProfileCard").innerHTML=rows.map(([k,v])=>`<div class="profile-item"><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}
@@ -1609,9 +1548,6 @@ function renderAdmin() {
     state.course.assessmentOpen
       ? "Close Assessment"
       : "Open Assessment";
-
-  $("toggleAssessmentBtn").disabled =
-    !state.course.published && !state.course.assessmentOpen;
 }
 
 function renderApplications() {
@@ -2328,6 +2264,7 @@ $("togglePublishBtn").onclick = async () => {
 
   } finally {
     btn.disabled = false;
+    btn.innerHTML = originalText;
   }
 };
 
@@ -2341,16 +2278,6 @@ $("toggleAssessmentBtn").onclick = async () => {
 
   const newAssessmentState =
     !state.course.assessmentOpen;
-
-  if (newAssessmentState && !state.course.published) {
-    alert("Publish the course before opening the assessment.");
-    return;
-  }
-
-  if (newAssessmentState && !(state.course.questions || []).length) {
-    alert("Add and save assessment questions before opening the assessment.");
-    return;
-  }
 
   const originalText =
     btn.innerHTML;
@@ -2402,6 +2329,7 @@ $("toggleAssessmentBtn").onclick = async () => {
 
   } finally {
     btn.disabled = false;
+    btn.innerHTML = originalText;
   }
 };
 
@@ -2438,7 +2366,6 @@ $("closeCourseBtn").onclick = async () => {
       .update({
         closed: true,
         published: false,
-        assessment_open: false,
         updated_at: new Date().toISOString()
       })
       .eq("id", state.course.id);
@@ -2461,8 +2388,7 @@ $("closeCourseBtn").onclick = async () => {
         section_number: 1,
         summary: "",
         published: false,
-        closed: false,
-        assessment_open: false
+        closed: false
       })
       .select()
       .single();
@@ -2488,8 +2414,6 @@ $("closeCourseBtn").onclick = async () => {
       summary: "",
 
       published: false,
-
-      assessmentOpen: false,
 
       questions: []
     };
@@ -2528,4 +2452,3 @@ function renderAdminCerts(){const all=state.students.flatMap(s=>(s.certificates|
 window.openCertificate=(sid,cid)=>{const s=state.students.find(x=>x.id===sid),c=s?.certificates?.find(x=>x.id===cid);if(!s||!c)return;$("certificatePreview").innerHTML=`<div class="certificate-sheet"><div class="cert-brand"><span>mi</span> Print Learning</div><h2>Certificate of Completion</h2><p>This certificate is proudly awarded to</p><div class="student-name">${esc(s.fullName)}</div><p>Certificate No. <strong>${esc(c.certificateCode||"MIP-LEGACY")}</strong></p><p>for successfully completing</p><div class="cert-course">${esc(c.courseTitle)}</div><p>with a final recorded score of <strong>${c.score}%</strong>.</p><div class="cert-footer"><span>Awarded: ${new Date(c.awardedAt).toLocaleDateString()}</span><span>mi Print • Tiangmaatla Multipurpose</span></div></div>`;openModal("certificateModal")};
 $("printCertificateBtn").onclick=()=>window.print();
 showPublic();
-checkInvitationSession();
