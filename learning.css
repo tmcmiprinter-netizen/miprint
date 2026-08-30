@@ -16,3 +16,33 @@ body{font-family:Inter,sans-serif;background:#fff;color:#0b0f12}button,input,tex
 @media(max-width:1050px){.learning-hero{grid-template-columns:1fr}.process-grid{grid-template-columns:repeat(2,1fr)}.app-shell{grid-template-columns:1fr}.sidebar{position:fixed;z-index:1500;left:-270px;width:250px;transition:.25s}.sidebar.open{left:0}.mobile-app-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}.mobile-app-top button{border:0;background:#fff;width:42px;height:42px;border-radius:12px}.dashboard-cards{grid-template-columns:repeat(2,1fr)}.builder-grid,.dashboard-grid{grid-template-columns:1fr}.data-row{grid-template-columns:1fr 1fr}.row-actions{grid-column:1/-1}.certificate-list{grid-template-columns:1fr}}
 @media(max-width:650px){.topbar{height:68px;padding:0 18px}.learning-hero{padding:52px 18px}.public-process{padding:70px 18px}.process-grid{grid-template-columns:1fr}.feature-strip{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.span-2{grid-column:auto}.modal-card{padding:26px 20px}.app-content{padding:24px 16px 45px}.dashboard-cards{grid-template-columns:1fr}.view-head{align-items:flex-start;flex-direction:column}.assessment-head{flex-direction:column}.profile-card{grid-template-columns:1fr}.data-row{grid-template-columns:1fr}.result-card{grid-template-columns:1fr}.certificate-sheet{padding:36px 22px}.certificate-sheet h2{font-size:2.2rem}.certificate-sheet .student-name{font-size:1.7rem}}
 @media print{body *{visibility:hidden!important}.certificate-sheet,.certificate-sheet *{visibility:visible!important}.certificate-sheet{position:absolute;left:0;top:0;width:100%;border:8px solid #000}.modal{background:#fff}}
+
+/* Forgot password button */
+#forgotPasswordBtn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+
+  background: #f3f6f8;
+  color: #192433;
+
+  border: 1px solid #d9e1e5;
+  border-radius: 10px;
+
+  padding: 13px 16px;
+
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  opacity: 1;
+  visibility: visible;
+}
+
+#forgotPasswordBtn:hover {
+  background: #e8eef1;
+  color: #192433;
+  border-color: #c8d3d9;
+}
