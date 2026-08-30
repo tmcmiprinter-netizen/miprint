@@ -1,0 +1,315 @@
+.about-page {
+  background: #080b0d;
+}
+
+.about-hero {
+  min-height: 720px;
+  padding: 70px 5vw 85px;
+  display: grid;
+  grid-template-columns: 1.03fr .97fr;
+  gap: 7vw;
+  align-items: center;
+  color: #fff;
+  background:
+    radial-gradient(circle at 17% 17%, rgba(32,198,107,.14), transparent 28%),
+    radial-gradient(circle at 84% 28%, rgba(70,201,243,.16), transparent 26%),
+    #080b0d;
+}
+
+.about-copy h1 {
+  max-width: 900px;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(3.1rem, 6vw, 6.6rem);
+  line-height: .96;
+  letter-spacing: -.06em;
+  margin: 24px 0;
+}
+
+.about-copy h1 span {
+  color: var(--blue);
+}
+
+.about-copy p {
+  max-width: 680px;
+  color: #aab8bf;
+  line-height: 1.85;
+}
+
+.about-tags {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.about-tags span {
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  color: #dce6ea;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.about-person-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.about-person-card {
+  width: min(520px, 100%);
+  min-height: 570px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 36px;
+  background: linear-gradient(150deg, #46c9f3 0%, #20c66b 100%);
+}
+
+.about-person-card img {
+  position: absolute;
+  height: 92%;
+  width: auto;
+  max-width: 92%;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  object-fit: contain;
+}
+
+.about-person-label {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: rgba(8,11,13,.84);
+  backdrop-filter: blur(12px);
+}
+
+.about-person-label small,
+.about-person-label strong {
+  display: block;
+}
+
+.about-person-label small {
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-weight: 800;
+}
+
+.about-person-label strong {
+  margin-top: 6px;
+  font-family: "Manrope", sans-serif;
+}
+
+.about-story {
+  background: #f4f8f9;
+  padding: 105px 5vw;
+}
+
+.about-story-card {
+  max-width: 850px;
+}
+
+.about-story-card h2,
+.representative-copy h2 {
+  font-family: "Manrope", sans-serif;
+  letter-spacing: -.045em;
+  font-size: clamp(2.4rem, 4.4vw, 4.8rem);
+  line-height: 1;
+  margin: 13px 0 22px;
+}
+
+.about-story-card p,
+.representative-copy p {
+  color: #65737a;
+  line-height: 1.8;
+}
+
+.about-story-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 18px;
+  margin-top: 48px;
+}
+
+.about-story-grid article {
+  min-height: 250px;
+  padding: 30px;
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid #e3eaed;
+}
+
+.about-story-grid i {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #07151b;
+  background: var(--blue);
+}
+
+.about-story-grid article:nth-child(2) i {
+  background: var(--green);
+}
+
+.about-story-grid article:nth-child(3) i {
+  background: #f5a34a;
+}
+
+.about-story-grid h3 {
+  margin: 25px 0 10px;
+  font-family: "Manrope", sans-serif;
+}
+
+.about-story-grid p {
+  color: #6a7880;
+  line-height: 1.7;
+  font-size: .9rem;
+}
+
+.representative-section {
+  background: #fff;
+  padding: 95px 5vw;
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+  gap: 7vw;
+  align-items: center;
+}
+
+.representative-visual {
+  min-height: 540px;
+  border-radius: 34px;
+  background: #0d1114;
+  overflow: hidden;
+  position: relative;
+}
+
+.representative-visual::before {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: .18;
+  left: -80px;
+  top: -80px;
+}
+
+.representative-visual img {
+  height: 100%;
+  max-height: 540px;
+  width: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  position: relative;
+  z-index: 2;
+}
+
+.representative-copy .btn {
+  margin-top: 28px;
+}
+
+.about-bottom-cta {
+  margin: 0 5vw 60px;
+  padding: 48px 52px;
+  min-height: 250px;
+  border-radius: 34px;
+  background: linear-gradient(120deg, var(--green), var(--blue));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+}
+
+.about-bottom-cta span {
+  font-size: .77rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+.about-bottom-cta h2 {
+  margin-top: 9px;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(2rem, 4vw, 4rem);
+  letter-spacing: -.045em;
+}
+
+.nav-about.active {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+@media (max-width: 900px) {
+  .about-hero,
+  .representative-section {
+    grid-template-columns: 1fr;
+  }
+
+  .about-story-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .about-hero,
+  .about-story,
+  .representative-section {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .about-hero {
+    padding-top: 55px;
+  }
+
+  .about-person-card {
+    min-height: 460px;
+  }
+
+  .about-bottom-cta {
+    margin: 0 20px 35px;
+    padding: 35px 24px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* About image now sits freely with no background card */
+.about-person-wrap {
+  position: relative;
+  min-height: 575px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+}
+.about-person-free {
+  width: auto;
+  max-width: 100%;
+  height: 575px;
+  object-fit: contain;
+  object-position: bottom center;
+  filter: drop-shadow(0 28px 45px rgba(0,0,0,.35));
+}
+.about-person-label {
+  left: 50%;
+  right: auto;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 30px));
+}
+@media (max-width: 700px) {
+  .about-person-wrap {
+    min-height: 430px;
+  }
+  .about-person-free {
+    height: 430px;
+  }
+}

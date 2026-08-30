@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>miPrinter | Upload PDF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0} :root{--green:#20c66b;--blue:#46c9f3;--black:#080b0d;--muted:#8fa0a8}
+body{min-height:100vh;font-family:Inter,sans-serif;background:radial-gradient(circle at 18% 12%,rgba(32,198,107,.14),transparent 28%),radial-gradient(circle at 86% 20%,rgba(70,201,243,.13),transparent 26%),var(--black);color:#fff;padding:24px}
+a{color:inherit;text-decoration:none}.page{width:min(1160px,100%);margin:auto}.topbar{height:64px;display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.brand{font:800 1.5rem Manrope,sans-serif}.brand .mi{color:var(--green)}.back{padding:10px 14px;border:1px solid rgba(255,255,255,.12);border-radius:999px;font-size:.82rem}
+.card{display:grid;grid-template-columns:.9fr 1.1fr;min-height:650px;border:1px solid rgba(255,255,255,.08);border-radius:32px;overflow:hidden;background:rgba(12,17,20,.86)}
+.intro,.upload{padding:52px}.intro{background:linear-gradient(145deg,rgba(32,198,107,.1),rgba(70,201,243,.04)),#0d1215}
+.kicker{color:var(--green);text-transform:uppercase;letter-spacing:.13em;font-size:.72rem;font-weight:800}
+h1{font:800 clamp(3rem,6vw,5.5rem)/.95 Manrope,sans-serif;letter-spacing:-.055em;margin:18px 0 22px} h1 span{color:var(--blue)}
+.intro>p,.upload-head p{color:#9badb5;line-height:1.75}.steps{display:grid;gap:14px;margin-top:34px}.step{display:flex;gap:13px;align-items:center}.num{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.06);color:var(--green);font-weight:800;font-size:.78rem}.step strong,.step span{display:block}.step strong{font-size:.86rem}.step span{font-size:.73rem;color:#788990;margin-top:4px}
+.note{display:flex;gap:12px;margin-top:30px;padding:16px;border-radius:16px;background:rgba(70,201,243,.08);border:1px solid rgba(70,201,243,.16);font-size:.76rem;line-height:1.5;color:#bcd6df}.note i{color:var(--blue)}
+.upload{display:flex;flex-direction:column;justify-content:center}.upload-head h2{font:800 clamp(2rem,3vw,3rem) Manrope,sans-serif;letter-spacing:-.04em}.upload-head p{margin-top:9px;font-size:.88rem}
+.field{margin-top:23px}.field label{display:block;margin-bottom:8px;font-size:.78rem;font-weight:700}.field input{width:100%;height:50px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:#0b1013;color:#fff;padding:0 15px;outline:none;font:inherit}.field input:focus{border-color:var(--blue)}
+.dropzone{margin-top:20px;min-height:230px;border:1.5px dashed rgba(255,255,255,.18);border-radius:22px;display:grid;place-items:center;text-align:center;padding:25px;cursor:pointer;background:rgba(255,255,255,.02)}.dropzone.dragover,.dropzone:hover{border-color:var(--green);background:rgba(32,198,107,.05)}
+.icon{width:66px;height:66px;margin:0 auto 15px;border-radius:20px;display:grid;place-items:center;background:rgba(32,198,107,.11);color:var(--green);font-size:1.5rem}.dropzone h3{font:700 1rem Manrope,sans-serif}.dropzone p{margin-top:7px;color:#7e9098;font-size:.77rem}.browse{color:var(--blue);font-weight:800}#pdfInput{display:none}
+.selected{display:none;margin-top:15px;padding:14px 16px;border-radius:15px;border:1px solid rgba(255,255,255,.08);background:#0b1013;align-items:center;gap:12px}.selected.show{display:flex}.selected>i{color:var(--blue);font-size:1.2rem}.meta{flex:1;min-width:0}.meta strong,.meta span{display:block}.meta strong{font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta span{color:#76878e;font-size:.71rem;margin-top:4px}.remove{border:0;background:none;color:#87979e;cursor:pointer}
+button.upload-btn{margin-top:20px;height:52px;border:0;border-radius:999px;background:var(--green);color:#04140a;font-weight:900;cursor:pointer}.upload-btn:disabled{opacity:.45;cursor:not-allowed}
+.progress{display:none;margin-top:16px}.progress.show{display:block}.ptext{display:flex;justify-content:space-between;font-size:.72rem;color:#98a9b1;margin-bottom:7px}.bar{height:7px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}.fill{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--blue));transition:.25s}
+.message{display:none;margin-top:16px;padding:15px;border-radius:15px;font-size:.79rem;line-height:1.55}.message.show{display:block}.success{background:rgba(32,198,107,.1);border:1px solid rgba(32,198,107,.2);color:#c8f4d9}.error{background:rgba(255,92,92,.09);border:1px solid rgba(255,92,92,.18);color:#ffcaca}.privacy{margin-top:14px;text-align:center;color:#66777e;font-size:.67rem;line-height:1.5}
+@media(max-width:900px){.card{grid-template-columns:1fr}.intro,.upload{padding:36px}}@media(max-width:600px){body{padding:14px}.intro,.upload{padding:26px 20px}.card{border-radius:24px}.dropzone{min-height:205px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <a class="brand" href="index.html"><span class="mi">mi</span> Print</a>
+    <a class="back" href="index.html"><i class="fa-solid fa-arrow-left"></i> Back to website</a>
+  </div>
+
+  <main class="card">
+    <section class="intro">
+      <span class="kicker">miPrinter</span>
+      <h1>Send it.<br><span>We'll print it.</span></h1>
+      <p>Upload your PDF directly to mi Print. No email, WhatsApp attachment or flash drive needed.</p>
+
+      <div class="steps">
+        <div class="step"><div class="num">01</div><div><strong>Select your PDF</strong><span>PDF only, maximum 10 MB.</span></div></div>
+        <div class="step"><div class="num">02</div><div><strong>Upload securely</strong><span>Your file enters our temporary print queue.</span></div></div>
+        <div class="step"><div class="num">03</div><div><strong>Visit the print desk</strong><span>Tell staff the name/reference you entered.</span></div></div>
+      </div>
+
+      <div class="note"><i class="fa-solid fa-clock"></i><div><strong>15-minute print queue</strong><br>Your document is intended to stay available to staff for only 15 minutes.</div></div>
+    </section>
+
+    <section class="upload">
+      <div class="upload-head">
+        <h2>Upload your PDF</h2>
+        <p>Add a short name or reference so staff can identify your document.</p>
+      </div>
+
+      <div class="field">
+        <label for="customerName">Your name / reference</label>
+        <input id="customerName" type="text" maxlength="60" placeholder="Example: Kagiso CV" autocomplete="off">
+      </div>
+
+      <label class="dropzone" id="dropzone" for="pdfInput">
+        <div>
+          <div class="icon"><i class="fa-solid fa-file-arrow-up"></i></div>
+          <h3>Drop your PDF here</h3>
+          <p>or <span class="browse">browse your device</span></p>
+          <p>PDF only • Maximum 10 MB</p>
+        </div>
+      </label>
+
+      <input id="pdfInput" type="file" accept="application/pdf,.pdf">
+
+      <div class="selected" id="selected">
+        <i class="fa-solid fa-file-pdf"></i>
+        <div class="meta"><strong id="fileName"></strong><span id="fileSize"></span></div>
+        <button class="remove" id="removeFile" type="button"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <button class="upload-btn" id="uploadBtn" type="button" disabled><i class="fa-solid fa-cloud-arrow-up"></i> Upload for Printing</button>
+
+      <div class="progress" id="progress">
+        <div class="ptext"><span id="progressText">Uploading...</span><span id="progressPercent">0%</span></div>
+        <div class="bar"><div class="fill" id="fill"></div></div>
+      </div>
+
+      <div class="message" id="message"></div>
+      <p class="privacy">Only upload documents you want mi Print staff to access for printing.</p>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://gwkcpbncazaeuiqdxqyn.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3a2NwYm5jYXphZXVpcWR4cXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2ODgyMzAsImV4cCI6MjEwMzI2NDIzMH0.bA0AwTwXn9TAK3szVxwiC9QQyRde3Dyt0DrSXABFQ1w";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const input=document.getElementById("pdfInput"),drop=document.getElementById("dropzone"),selected=document.getElementById("selected"),nameEl=document.getElementById("fileName"),sizeEl=document.getElementById("fileSize"),removeBtn=document.getElementById("removeFile"),uploadBtn=document.getElementById("uploadBtn"),customer=document.getElementById("customerName"),progress=document.getElementById("progress"),fill=document.getElementById("fill"),ptext=document.getElementById("progressText"),pper=document.getElementById("progressPercent"),message=document.getElementById("message");
+const MAX=10*1024*1024; let currentFile=null;
+
+function msg(text,type){message.textContent=text;message.className="message show "+type}
+function clearMsg(){message.className="message";message.textContent=""}
+function bytes(n){return n>=1048576?(n/1048576).toFixed(2)+" MB":Math.round(n/1024)+" KB"}
+function valid(file){if(!file)return"Please select a PDF file.";const pdf=file.type==="application/pdf"||file.name.toLowerCase().endsWith(".pdf");if(!pdf)return"Only PDF documents are allowed.";if(file.size>MAX)return"The PDF is larger than 10 MB.";return null}
+function setFile(file){clearMsg();const e=valid(file);if(e){currentFile=null;input.value="";selected.classList.remove("show");uploadBtn.disabled=true;msg(e,"error");return}currentFile=file;nameEl.textContent=file.name;sizeEl.textContent=bytes(file.size);selected.classList.add("show");uploadBtn.disabled=false}
+function setProgress(n,text){progress.classList.add("show");fill.style.width=n+"%";pper.textContent=n+"%";ptext.textContent=text}
+function resetProgress(){progress.classList.remove("show");fill.style.width="0%";pper.textContent="0%"}
+function clean(name){return name.normalize("NFKD").replace(/[^\w.\-]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")||"document.pdf"}
+
+input.addEventListener("change",()=>setFile(input.files[0]));
+removeBtn.addEventListener("click",()=>{currentFile=null;input.value="";selected.classList.remove("show");uploadBtn.disabled=true;clearMsg();resetProgress()});
+["dragenter","dragover"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add("dragover")}));
+["dragleave","drop"].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove("dragover")}));
+drop.addEventListener("drop",ev=>setFile(ev.dataTransfer.files[0]));
+
+uploadBtn.addEventListener("click",async()=>{
+  clearMsg();
+  const e=valid(currentFile); if(e){msg(e,"error");return}
+  const ref=customer.value.trim(); if(!ref){msg("Please enter your name or a short reference.","error");customer.focus();return}
+  uploadBtn.disabled=true;input.disabled=true;customer.disabled=true;
+  const id=crypto.randomUUID(), storagePath=`${id}/${clean(currentFile.name)}`;
+  try{
+    setProgress(15,"Preparing document...");
+    const {error:upErr}=await client.storage.from("miprinter").upload(storagePath,currentFile,{cacheControl:"0",upsert:false,contentType:"application/pdf"});
+    if(upErr)throw upErr;
+    setProgress(75,"Adding to print queue...");
+    const {error:dbErr}=await client.from("miprinter_jobs").insert({id,file_name:currentFile.name,storage_path:storagePath,file_size:currentFile.size,customer_name:ref,status:"waiting"});
+    if(dbErr){await client.storage.from("miprinter").remove([storagePath]);throw dbErr}
+    setProgress(100,"Upload complete");
+    msg(`Upload successful. Tell staff your reference: "${ref}". Your document is in the 15-minute print queue.`,"success");
+    currentFile=null;input.value="";selected.classList.remove("show");customer.value="";
+    setTimeout(()=>{resetProgress();input.disabled=false;customer.disabled=false;uploadBtn.disabled=true},1500);
+  }catch(err){
+    console.error(err);resetProgress();uploadBtn.disabled=false;input.disabled=false;customer.disabled=false;msg(err?.message||"Upload failed. Please try again.","error");
+  }
+});
+</script>
+</body>
+</html>

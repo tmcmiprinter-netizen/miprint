@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>miPrinter Queue | mi Print</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--green:#20c66b;--blue:#46c9f3;--black:#080b0d;--panel:#11171b;--muted:#819199;--red:#ff6b6b}
+body{font-family:Inter,sans-serif;background:#080b0d;color:#fff;min-height:100vh}
+button,a{font:inherit}
+.shell{width:min(1280px,100%);margin:auto;padding:24px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}
+.brand{font:800 1.5rem Manrope,sans-serif}.brand .mi{color:var(--green)}
+.status-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid rgba(255,255,255,.1);border-radius:999px;color:#c6d3d8;font-size:.76rem}
+.status-pill i{color:var(--green);font-size:.55rem}
+.hero{display:flex;align-items:end;justify-content:space-between;gap:25px;margin-bottom:28px}
+.hero h1{font:800 clamp(2.6rem,6vw,5.5rem)/.95 Manrope,sans-serif;letter-spacing:-.055em}
+.hero h1 span{color:var(--blue)}
+.hero p{max-width:540px;color:#8fa0a8;line-height:1.7;margin-top:13px}
+.refresh{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#fff;border-radius:999px;padding:12px 16px;cursor:pointer}
+.refresh:hover{border-color:var(--blue);color:var(--blue)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+.stat{padding:20px;border-radius:20px;background:#10161a;border:1px solid rgba(255,255,255,.07)}
+.stat strong{display:block;font:800 1.8rem Manrope,sans-serif}.stat span{display:block;color:#7e8f96;font-size:.75rem;margin-top:5px}
+.queue{display:grid;gap:14px}
+.job{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;padding:18px;border-radius:22px;background:#10161a;border:1px solid rgba(255,255,255,.07)}
+.job-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:rgba(70,201,243,.11);color:var(--blue);font-size:1.25rem}
+.job-main{min-width:0}.job-ref{font:800 1rem Manrope,sans-serif}.job-name{margin-top:4px;color:#a7b5bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:9px;color:#6f8189;font-size:.72rem}.meta span{display:inline-flex;align-items:center;gap:6px}
+.countdown{color:var(--green);font-weight:800}.countdown.warning{color:#ffb84d}.countdown.danger{color:var(--red)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:0;border-radius:999px;padding:10px 13px;font-weight:800;font-size:.76rem;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.btn-view{background:rgba(70,201,243,.12);color:var(--blue);border:1px solid rgba(70,201,243,.18)}
+.btn-print{background:var(--green);color:#04150a}
+.btn-delete{background:rgba(255,107,107,.1);color:#ff9b9b;border:1px solid rgba(255,107,107,.15)}
+.empty{padding:70px 20px;text-align:center;border:1px dashed rgba(255,255,255,.12);border-radius:24px;color:#788990}
+.empty i{display:block;font-size:2rem;color:#425159;margin-bottom:14px}
+.note{margin-top:22px;padding:14px 16px;border:1px solid rgba(255,184,77,.16);background:rgba(255,184,77,.06);border-radius:16px;color:#a99b7e;font-size:.72rem;line-height:1.6}
+.hidden{display:none!important}
+@media(max-width:850px){.hero{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:1fr}.job{grid-template-columns:auto 1fr}.actions{grid-column:1/-1;justify-content:flex-start;padding-left:72px}}
+@media(max-width:560px){.shell{padding:14px}.job{grid-template-columns:1fr}.job-icon{display:none}.actions{padding-left:0}.actions .btn{flex:1;justify-content:center}.topbar{align-items:flex-start;flex-direction:column}.hero h1{font-size:3.2rem}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand"><span class="mi">mi</span> Print <span style="color:#5e6d74;font-weight:600">/ miPrinter</span></div>
+    <div class="status-pill"><i class="fa-solid fa-circle"></i> Live print queue</div>
+  </div>
+
+  <section class="hero">
+    <div>
+      <h1>Print <span>Queue.</span></h1>
+      <p>Customer PDFs stay visible here for 15 minutes. Open or print a document, then delete it from the queue when finished.</p>
+    </div>
+    <button class="refresh" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><strong id="activeCount">0</strong><span>Active documents</span></div>
+    <div class="stat"><strong id="totalSize">0 KB</strong><span>Total active size</span></div>
+    <div class="stat"><strong id="oldestTime">—</strong><span>Oldest remaining time</span></div>
+  </section>
+
+  <section class="queue" id="queue"></section>
+
+  <div class="empty hidden" id="empty">
+    <i class="fa-solid fa-inbox"></i>
+    <strong>No PDFs waiting</strong>
+    <p style="margin-top:8px">New customer uploads will appear here automatically.</p>
+  </div>
+
+  <div class="note">
+    <strong>Important:</strong> this is a hidden no-login admin page, not a secured admin account. Anyone who discovers the URL and project client credentials could potentially access the same anonymous permissions. Add staff authentication or a server-side PIN before using this for sensitive documents.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://gwkcpbncazaeuiqdxqyn.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3a2NwYm5jYXphZXVpcWR4cXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2ODgyMzAsImV4cCI6MjEwMzI2NDIzMH0.bA0AwTwXn9TAK3szVxwiC9QQyRde3Dyt0DrSXABFQ1w";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+const queue=document.getElementById("queue");
+const empty=document.getElementById("empty");
+const activeCount=document.getElementById("activeCount");
+const totalSize=document.getElementById("totalSize");
+const oldestTime=document.getElementById("oldestTime");
+const refreshBtn=document.getElementById("refreshBtn");
+
+let jobs=[];
+
+function formatBytes(bytes){
+  if(!bytes)return"0 KB";
+  if(bytes>=1048576)return(bytes/1048576).toFixed(2)+" MB";
+  return Math.max(1,Math.round(bytes/1024))+" KB";
+}
+function timeAgo(date){
+  const s=Math.max(0,Math.floor((Date.now()-new Date(date).getTime())/1000));
+  if(s<60)return s+" sec ago";
+  const m=Math.floor(s/60); return m+" min ago";
+}
+function remaining(expiresAt){
+  const ms=new Date(expiresAt).getTime()-Date.now();
+  if(ms<=0)return{ms:0,text:"Expired"};
+  const total=Math.floor(ms/1000),m=Math.floor(total/60),s=total%60;
+  return{ms,text:`${m}:${String(s).padStart(2,"0")}`};
+}
+function escapeHtml(str=""){return String(str).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","\'":"&#039;"}[c]))}
+
+async function loadJobs(){
+  const {data,error}=await client.from("miprinter_jobs")
+    .select("*")
+    .eq("status","waiting")
+    .gt("expires_at",new Date().toISOString())
+    .order("created_at",{ascending:true});
+
+  if(error){console.error(error);queue.innerHTML=`<div class="empty"><strong>Could not load print queue</strong><p style="margin-top:8px">${escapeHtml(error.message)}</p></div>`;return}
+  jobs=data||[];
+  render();
+}
+
+function render(){
+  const now=Date.now();
+  jobs=jobs.filter(j=>new Date(j.expires_at).getTime()>now);
+
+  activeCount.textContent=jobs.length;
+  totalSize.textContent=formatBytes(jobs.reduce((a,j)=>a+(Number(j.file_size)||0),0));
+
+  if(jobs.length){
+    const min=Math.min(...jobs.map(j=>new Date(j.expires_at).getTime()-now));
+    const r=remaining(new Date(now+min).toISOString());
+    oldestTime.textContent=r.text;
+  }else oldestTime.textContent="—";
+
+  empty.classList.toggle("hidden",jobs.length>0);
+
+  queue.innerHTML=jobs.map(j=>{
+    const r=remaining(j.expires_at);
+    const mins=r.ms/60000;
+    const cls=mins<=2?"danger":mins<=5?"warning":"";
+    return `
+      <article class="job" data-id="${j.id}">
+        <div class="job-icon"><i class="fa-solid fa-file-pdf"></i></div>
+        <div class="job-main">
+          <div class="job-ref">${escapeHtml(j.customer_name||"No reference")}</div>
+          <div class="job-name">${escapeHtml(j.file_name)}</div>
+          <div class="meta">
+            <span><i class="fa-solid fa-hard-drive"></i> ${formatBytes(j.file_size)}</span>
+            <span><i class="fa-solid fa-clock-rotate-left"></i> ${timeAgo(j.created_at)}</span>
+            <span class="countdown ${cls}" data-exp="${j.expires_at}"><i class="fa-regular fa-clock"></i> ${r.text}</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-view" onclick="viewJob('${j.id}')"><i class="fa-solid fa-eye"></i> View</button>
+          <button class="btn btn-print" onclick="printJob('${j.id}')"><i class="fa-solid fa-print"></i> Print</button>
+          <button class="btn btn-delete" onclick="deleteJob('${j.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+        </div>
+      </article>`;
+  }).join("");
+}
+
+async function signedUrl(job){
+  const {data,error}=await client.storage.from("miprinter").createSignedUrl(job.storage_path,60);
+  if(error)throw error;
+  return data.signedUrl;
+}
+
+window.viewJob=async function(id){
+  const job=jobs.find(j=>j.id===id); if(!job)return;
+  try{window.open(await signedUrl(job),"_blank","noopener,noreferrer")}catch(e){alert("Could not open PDF: "+e.message)}
+}
+
+window.printJob=async function(id){
+  const job=jobs.find(j=>j.id===id); if(!job)return;
+  try{
+    const url=await signedUrl(job);
+    const w=window.open(url,"_blank");
+    if(!w){alert("Popup blocked. Allow popups, then try again.");return}
+    setTimeout(()=>{try{w.focus();w.print()}catch(_){}},1800);
+  }catch(e){alert("Could not print PDF: "+e.message)}
+}
+
+window.deleteJob=async function(id){
+  const job=jobs.find(j=>j.id===id); if(!job)return;
+  if(!confirm(`Delete "${job.file_name}" from the print queue?`))return;
+
+  const {error:storageError}=await client.storage.from("miprinter").remove([job.storage_path]);
+  if(storageError){alert("Could not delete PDF: "+storageError.message);return}
+
+  const {error:dbError}=await client.from("miprinter_jobs").delete().eq("id",id);
+  if(dbError){alert("PDF deleted, but queue record could not be removed: "+dbError.message)}
+
+  jobs=jobs.filter(j=>j.id!==id);
+  render();
+}
+
+
+async function autoDeleteExpired(){
+  const expired=jobs.filter(j=>new Date(j.expires_at).getTime()<=Date.now());
+  if(!expired.length)return;
+
+  for(const job of expired){
+    try{
+      await client.storage.from("miprinter").remove([job.storage_path]);
+      await client.from("miprinter_jobs").delete().eq("id",job.id);
+    }catch(e){
+      console.error("Expired job cleanup failed:",job.id,e);
+    }
+  }
+
+  jobs=jobs.filter(j=>new Date(j.expires_at).getTime()>Date.now());
+  render();
+}
+
+refreshBtn.addEventListener("click",loadJobs);
+
+setInterval(()=>{
+  const now=Date.now();
+  let changed=false;
+
+  document.querySelectorAll(".countdown").forEach(el=>{
+    const r=remaining(el.dataset.exp);
+    const mins=r.ms/60000;
+    el.classList.toggle("warning",mins<=5&&mins>2);
+    el.classList.toggle("danger",mins<=2);
+    el.innerHTML=`<i class="fa-regular fa-clock"></i> ${r.text}`;
+    if(r.ms<=0)changed=true;
+  });
+
+  if(changed){
+    autoDeleteExpired();
+  }else if(jobs.length){
+    const min=Math.min(...jobs.map(j=>new Date(j.expires_at).getTime()-now));
+    oldestTime.textContent=remaining(new Date(now+min).toISOString()).text;
+  }
+},1000);
+
+// Realtime refresh on queue changes
+client.channel("miprinter-live")
+  .on("postgres_changes",{event:"*",schema:"public",table:"miprinter_jobs"},()=>loadJobs())
+  .subscribe();
+
+loadJobs().then(()=>autoDeleteExpired());
+</script>
+</body>
+</html>
