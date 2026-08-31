@@ -2952,17 +2952,45 @@ window.approveApplication = async id => {
     );
 
     if (error) {
+  console.error(
+    "Approval function error:",
+    error
+  );
+
+  let functionMessage =
+    data?.error ||
+    error.message ||
+    "Unable to approve application.";
+
+  try {
+    const response =
+      error.context;
+
+    if (response) {
+      const result =
+        await response.json();
+
       console.error(
-        "Approval function error:",
-        error
+        "Approval function response:",
+        result
       );
 
-      throw new Error(
-        data?.error ||
-        error.message ||
-        "Unable to approve application."
-      );
+      functionMessage =
+        result?.error ||
+        result?.message ||
+        functionMessage;
     }
+  } catch (responseError) {
+    console.error(
+      "Unable to read approval error response:",
+      responseError
+    );
+  }
+
+  throw new Error(
+    functionMessage
+  );
+}
 
     if (!data?.success) {
       throw new Error(
