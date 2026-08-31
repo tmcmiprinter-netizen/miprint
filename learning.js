@@ -4153,6 +4153,32 @@ async function restoreLearningSession() {
     const user =
       authSession?.user;
 
+      const url =
+  new URL(
+    window.location.href
+  );
+
+const hashParams =
+  new URLSearchParams(
+    window.location.hash
+      .replace(/^#/, "")
+  );
+
+const isInvite =
+  url.searchParams.get("type") === "invite" ||
+  hashParams.get("type") === "invite";
+
+if (isInvite && user) {
+  passwordSetupAllowed = true;
+
+  showPublic();
+
+  openModal(
+    "setPasswordModal"
+  );
+
+  return;
+}
 
     if (!user) {
       showPublic();
