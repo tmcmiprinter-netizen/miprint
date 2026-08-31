@@ -1885,12 +1885,20 @@ function renderStudent(){
      : null;
  $("studentWelcome").textContent=`Welcome, ${s.fullName.split(" ")[0]}`;$("dashProgress").textContent=p.attempts.length?`${p.attempts.length}/2 attempts used`:"Not started";$("dashMark").textContent=best===null?"—":`${best}%`;$("dashCertificates").textContent=(s.certificates||[]).length;
  ["dashCourseTitle","courseTitleStudent","courseHeadingStudent"].forEach(id=>$(id).textContent=state.course.title);$("dashCourseDescription").textContent=state.course.description;$("courseSubtitleStudent").textContent=state.course.subtitle;$("courseDescriptionStudent").textContent=state.course.description;
+const coursePassed =
+  p.attempts.some(
+    attempt =>
+      attempt.result === "pass"
+  );
+
 const left =
   courseSelected
-    ? Math.max(
-        0,
-        2 - p.attempts.length
-      )
+    ? coursePassed
+      ? 0
+      : Math.max(
+          0,
+          2 - p.attempts.length
+        )
     : 0;
 
 $("attemptChip").textContent =
@@ -1981,8 +1989,15 @@ function renderAssessment(s) {
     s.progress?.[state.course.id]?.attempts ||
     [];
 
-  const disabled =
-    attempts.length >= 2;
+const alreadyPassed =
+  attempts.some(
+    attempt =>
+      attempt.result === "pass"
+  );
+
+const disabled =
+  alreadyPassed ||
+  attempts.length >= 2;ength >= 2;
 
 
   $("assessmentForm").innerHTML =
@@ -2025,11 +2040,261 @@ function renderAssessment(s) {
   $("submitAssessmentBtn").disabled =
     disabled;
 
-  $("submitAssessmentBtn").textContent =
-    disabled
+$("submitAssessmentBtn").textContent =
+  alreadyPassed
+    ? "Course Passed"
+    : attempts.length >= 2
       ? "No attempts remaining"
-      : "Submit Assessment";
+      : attempts.length === 1
+        ? "Submit Final Attempt"
+        : "Submit Assessment";
 }
+$("submitAssessmentBtn").onclick = async () => {
+
+  const student =
+    currentStudent();
+
+  const courseId =
+    state.course?.id;
+
+  const msg =
+    $("assessmentMessage");
+
+  const btn =
+    $("submitAssessmentBtn");
+
+
+  if (!student || !courseId) {
+
+    alert(
+      "Open an enrolled course first."
+    );
+
+    return;
+  }
+
+
+  const attempts =
+    student.progress?.[courseId]?.attempts ||
+    [];
+
+
+  const alreadyPassed =
+    attempts.some(
+      attempt =>
+        attempt.result === "pass"
+    );
+
+
+  if (alreadyPassed) {
+
+    msg.className =
+      "form-message success";
+
+    msg.textContent =
+      "You already passed this course. No further attempt is required.";
+
+    return;
+  }
+
+
+  if (attempts.length >= 2) {
+
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      "You have used both assessment attempts.";
+
+    return;
+  }
+
+
+  const selectedAnswerIds = [];
+
+
+  for (
+    const question
+    of state.course.questions || []
+  ) {
+
+    const selected =
+      document.querySelector(
+        `input[name="${question.id}"]:checked`
+      );
+
+
+    if (!selected) {
+
+      msg.className =
+        "form-message error";
+
+      msg.textContent =
+        "Please answer every question before submitting.";
+
+      return;
+    }
+
+
+    selectedAnswerIds.push(
+      selected.value
+    );
+  }
+
+
+  if (!selectedAnswerIds.length) {
+
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      "There are no assessment questions to submit.";
+
+    return;
+  }
+
+
+  const originalText =
+    btn.innerHTML;
+
+
+  btn.disabled = true;
+
+  btn.innerHTML =
+    '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+
+
+  msg.className =
+    "form-message";
+
+  msg.textContent =
+    "Submitting and recording your assessment...";
+
+
+  try {
+
+    const {
+      error
+    } =
+      await supabaseClient.rpc(
+        "submit_learning_assessment",
+        {
+          p_course_id:
+            courseId,
+
+          p_answer_ids:
+            selectedAnswerIds
+        }
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    await loadStudentProgress();
+
+    await loadStudentEnrollments();
+
+
+    const refreshedAttempts =
+      student.progress?.[courseId]?.attempts ||
+      [];
+
+
+    const latestAttempt =
+      refreshedAttempts[
+        refreshedAttempts.length - 1
+      ];
+
+
+    if (
+      latestAttempt?.result === "pass"
+    ) {
+
+      msg.className =
+        "form-message success";
+
+      msg.textContent =
+        `Congratulations. You passed with ${latestAttempt.score}%. Your certificate has been recorded.`;
+
+    } else if (
+      refreshedAttempts.length === 1
+    ) {
+
+      msg.className =
+        "form-message error";
+
+      msg.textContent =
+        `You scored ${latestAttempt?.score ?? 0}%. The pass mark is 60%. You have one final attempt remaining.`;
+
+    } else {
+
+      msg.className =
+        "form-message error";
+
+      msg.textContent =
+        `You scored ${latestAttempt?.score ?? 0}%. You have now used both attempts.`;
+    }
+
+
+    renderStudent();
+
+    renderMyCourses();
+
+
+  } catch (error) {
+
+    console.error(
+      "Assessment submission failed:",
+      error
+    );
+
+
+    msg.className =
+      "form-message error";
+
+    msg.textContent =
+      error?.message ||
+      "Unable to submit your assessment.";
+
+
+    renderAssessment(
+      student
+    );
+
+
+  } finally {
+
+    const latestAttempts =
+      student.progress?.[courseId]?.attempts ||
+      [];
+
+
+    const latestPassed =
+      latestAttempts.some(
+        attempt =>
+          attempt.result === "pass"
+      );
+
+
+    if (
+      !latestPassed &&
+      latestAttempts.length < 2 &&
+      state.course.assessmentOpen
+    ) {
+
+      btn.disabled = false;
+
+      btn.innerHTML =
+        latestAttempts.length === 1
+          ? "Submit Final Attempt"
+          : originalText;
+    }
+  }
+};
+
 function renderResults(s) {
 
   const allResults = [];
@@ -3120,7 +3385,226 @@ $("closeCourseBtn").onclick = async () => {
 };
 
 function renderAdminCerts(){const all=state.students.flatMap(s=>(s.certificates||[]).map(c=>({s,c})));$("certificateAdminList").innerHTML=all.length?all.map(({s,c})=>`<article class="certificate-card"><h3>${esc(s.fullName)}</h3><p><strong>${esc(c.certificateCode||"Pending code")}</strong> • ${esc(c.courseTitle)} • ${c.score}% • ${new Date(c.awardedAt).toLocaleDateString()}</p><button class="primary-btn" onclick="openCertificate('${s.id}','${c.id}')">Print / Save PDF</button></article>`).join(""):`<div class="locked-card"><i class="fa-solid fa-award"></i><h3>No certificates yet</h3></div>`}
-window.openCertificate=(sid,cid)=>{const s=state.students.find(x=>x.id===sid),c=s?.certificates?.find(x=>x.id===cid);if(!s||!c)return;$("certificatePreview").innerHTML=`<div class="certificate-sheet"><div class="cert-brand"><span>mi</span> Print Learning</div><h2>Certificate of Completion</h2><p>This certificate is proudly awarded to</p><div class="student-name">${esc(s.fullName)}</div><p>Certificate No. <strong>${esc(c.certificateCode||"MIP-LEGACY")}</strong></p><p>for successfully completing</p><div class="cert-course">${esc(c.courseTitle)}</div><p>with a final recorded score of <strong>${c.score}%</strong>.</p><div class="cert-footer"><span>Awarded: ${new Date(c.awardedAt).toLocaleDateString()}</span><span>mi Print • Tiangmaatla Multipurpose</span></div></div>`;openModal("certificateModal")};
+window.openCertificate = (sid, cid) => {
+
+  const student =
+    state.students.find(
+      item => item.id === sid
+    );
+
+  const certificate =
+    student?.certificates?.find(
+      item => item.id === cid
+    );
+
+  if (!student || !certificate) {
+    return;
+  }
+
+
+  const awardDate =
+    new Date(
+      certificate.awardedAt
+    ).toLocaleDateString(
+      "en-ZA",
+      {
+        day: "2-digit",
+        month: "long",
+        year: "numeric"
+      }
+    );
+
+
+  const certificateNumber =
+    certificate.certificateCode ||
+    "MIP-LEGACY";
+
+
+  $("certificatePreview").innerHTML = `
+
+    <div class="certificate-sheet">
+
+
+      <!-- SECURITY BACKGROUND -->
+      <div
+        class="certificate-security-mark"
+        aria-hidden="true"
+      >
+        MI PRINT
+      </div>
+
+
+      <!-- TOP BRAND -->
+      <header class="certificate-header">
+
+        <div class="certificate-brand">
+          <span>mi</span> Print
+        </div>
+
+        <div class="certificate-brand-subtitle">
+          LEARNING
+        </div>
+
+        <div class="certificate-number">
+          CERTIFICATE NO.
+          <strong>
+            ${esc(certificateNumber)}
+          </strong>
+        </div>
+
+      </header>
+
+
+      <!-- MAIN CERTIFICATE CONTENT -->
+      <main class="certificate-main">
+
+        <h1>
+          Certificate
+          <span>of Achievement</span>
+        </h1>
+
+
+        <div class="certificate-ornament">
+
+          <span></span>
+
+          <i class="fa-solid fa-diamond"></i>
+
+          <span></span>
+
+        </div>
+
+
+        <p class="certificate-intro">
+          This certificate is proudly presented to
+        </p>
+
+
+        <div class="certificate-student-name">
+          ${esc(student.fullName)}
+        </div>
+
+
+        <p class="certificate-copy">
+          for successfully completing the learning programme
+        </p>
+
+
+        <div class="certificate-course-name">
+          ${esc(certificate.courseTitle)}
+        </div>
+
+
+        <p class="certificate-copy certificate-copy-small">
+          and demonstrating satisfactory knowledge
+          and understanding of the course content.
+        </p>
+
+
+        <div class="certificate-score">
+
+          <span>
+            Final Recorded Score
+          </span>
+
+          <strong>
+            ${certificate.score}%
+          </strong>
+
+        </div>
+
+      </main>
+
+
+      <!-- SIGNATURE AND DATE -->
+      <section class="certificate-authorisation">
+
+
+        <div class="certificate-signature-block">
+
+          <div class="signature-space">
+
+            <img
+              src="assets/images/signature.png"
+              alt="Managing Director signature"
+              class="certificate-signature-image"
+            >
+
+          </div>
+
+          <div class="certificate-sign-line"></div>
+
+          <strong>
+            Managing Director
+          </strong>
+
+          <small>
+            Authorised Signature
+          </small>
+
+        </div>
+
+
+        <div class="certificate-date-block">
+
+          <div class="certificate-date-value">
+            ${awardDate}
+          </div>
+
+          <div class="certificate-sign-line"></div>
+
+          <strong>
+            Date of Completion
+          </strong>
+
+          <small>
+            Certificate Award Date
+          </small>
+
+        </div>
+
+
+      </section>
+
+
+      <!-- BOTTOM ORGANISATION LOGOS -->
+      <footer class="certificate-logo-footer">
+
+        <div class="certificate-logo-rule"></div>
+
+        <div class="certificate-logos">
+
+          <img
+            src="assets/images/logo-001.png"
+            alt="Organisation logo"
+          >
+
+          <img
+            src="assets/images/logo-002.png"
+            alt="Organisation logo"
+          >
+
+          <img
+            src="assets/images/logo-003.png"
+            alt="Organisation logo"
+          >
+
+        </div>
+
+      </footer>
+
+
+    </div>
+
+  `;
+
+
+  openModal(
+    "certificateModal"
+  );
+
+};
+
 $("printCertificateBtn").onclick=()=>window.print();
 async function restoreLearningSession() {
 
@@ -3225,4 +3709,69 @@ async function restoreLearningSession() {
 }
 
 
-restoreLearningSession();
+async function initializeLearningPage() {
+
+  const minimumLoadingTime =
+    5000;
+
+  const startedAt =
+    Date.now();
+
+
+  try {
+
+    await restoreLearningSession();
+
+  } finally {
+
+    const elapsed =
+      Date.now() -
+      startedAt;
+
+
+    const remaining =
+      Math.max(
+        0,
+        minimumLoadingTime -
+        elapsed
+      );
+
+
+    if (remaining > 0) {
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            remaining
+          )
+      );
+    }
+
+
+    const loader =
+      $("learningPageLoader");
+
+
+    if (loader) {
+
+      loader.classList.add(
+        "ready"
+      );
+
+
+      setTimeout(
+        () =>
+          loader.classList.add(
+            "hidden"
+          ),
+        500
+      );
+    }
+
+  }
+
+}
+
+
+initializeLearningPage();
