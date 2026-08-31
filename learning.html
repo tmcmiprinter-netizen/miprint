@@ -129,6 +129,21 @@
 <div class="field span-2"><label>Residential address</label><textarea id="regAddress" rows="3"></textarea></div>
 <div class="field"><label>Highest education level</label><select id="regEducation"><option>Primary</option><option>Grade 9</option><option>Grade 12 / Matric</option><option>College / TVET</option><option>University</option><option>Other</option></select></div>
 <div class="field"><label>Current status</label><select id="regStatus"><option>Student / Learner</option><option>Job Seeker</option><option>Employed</option><option>Self-employed</option><option>Other</option></select></div>
+<div class="field span-2">
+  <label>
+    Course you are applying for
+  </label>
+
+  <select id="regCourse">
+    <option value="">
+      Select a course
+    </option>
+  </select>
+
+  <small class="field-help">
+    Choose the training course you want to apply for.
+  </small>
+</div>
 <div class="field span-2"><label id="documentLabel">Certified ID document</label><input id="regDocument" type="file" accept="application/pdf,.pdf"><small>PDF only • Maximum file size: 25 MB • Certified ID or valid passport.</small></div>
 <div class="field span-2 consent"><label><input id="regConsent" type="checkbox"> I confirm the information is correct and consent to mi Print using it for training administration.</label></div>
 </div><button class="primary-btn full" id="registerSubmitBtn">Submit Application</button><div class="form-message" id="registerMessage"></div></div></div>
@@ -174,7 +189,54 @@
 <section id="adminApp" class="app-shell hidden"><aside class="sidebar"><div class="side-brand"><span>mi</span> Print <small>Admin</small></div><nav><button class="nav-item active" data-admin-view="adminDashboard"><i class="fa-solid fa-gauge-high"></i> Overview</button><button class="nav-item" data-admin-view="adminApplications"><i class="fa-solid fa-user-plus"></i> Applications</button><button class="nav-item" data-admin-view="adminStudents"><i class="fa-solid fa-users"></i> Students</button><button class="nav-item" data-admin-view="adminCourse"><i class="fa-solid fa-book"></i> Course Builder</button><button class="nav-item" data-admin-view="adminCertificates"><i class="fa-solid fa-award"></i> Certificates</button></nav><button class="logout-btn" id="adminLogoutBtn"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button></aside>
 <div class="app-content"><div class="mobile-app-top"><div class="side-brand"><span>mi</span> Print <small>Admin</small></div><button id="adminMenuBtn"><i class="fa-solid fa-bars"></i></button></div>
 <section id="adminDashboard" class="app-view"><div class="view-head"><div><span>Administration</span><h2>Learning Overview</h2></div><div class="status-chip green">Admin</div></div><div class="dashboard-cards"><article><i class="fa-solid fa-inbox"></i><span>Applications</span><strong id="adminPendingCount">0</strong></article><article><i class="fa-solid fa-user-graduate"></i><span>Approved students</span><strong id="adminApprovedCount">0</strong></article><article><i class="fa-solid fa-trophy"></i><span>Top student</span><strong id="adminTopStudent">—</strong></article><article><i class="fa-solid fa-award"></i><span>Certificates</span><strong id="adminCertificateCount">0</strong></article></div><div class="dashboard-grid"><article class="panel"><span class="panel-kicker">Current course</span><h3 id="adminCurrentCourse"></h3><p id="adminCurrentCourseState"></p><button class="primary-btn" data-admin-jump="adminCourse">Manage Course</button></article><article class="panel"><span class="panel-kicker">Course workflow</span><ol class="mini-steps"><li>Create summary & questions</li><li>Promote course & collect applications</li><li>Approve students</li><li>Publish lesson</li><li>Print certificates</li><li>Close course session</li></ol></article></div></section>
-<section id="adminApplications" class="app-view hidden"><div class="view-head"><div><span>Admissions</span><h2>Applications</h2></div></div><div id="applicationsTable" class="data-list"></div></section>
+<section id="adminApplications" class="app-view hidden">
+
+  <div class="view-head">
+    <div>
+      <span>Admissions</span>
+      <h2>Applications</h2>
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="panel-kicker">
+      Student Accounts
+    </span>
+
+    <h3>
+      New Student Applications
+    </h3>
+
+    <p>
+      First-time applications for a student account.
+    </p>
+
+    <div
+      id="applicationsTable"
+      class="data-list"
+    ></div>
+  </div>
+
+  <div class="panel" style="margin-top:20px;">
+    <span class="panel-kicker">
+      Course Access
+    </span>
+
+    <h3>
+      Course Applications
+    </h3>
+
+    <p>
+      Existing students requesting access to a specific course.
+    </p>
+
+    <div
+      id="courseApplicationsTable"
+      class="data-list"
+    ></div>
+  </div>
+
+</section>
 <section id="adminStudents" class="app-view hidden"><div class="view-head"><div><span>Course list</span><h2>Students</h2></div></div><div id="studentsTable" class="data-list"></div></section>
 <section id="adminCourse" class="app-view hidden"><div class="view-head"><div><span>Course Builder</span><h2>Create & Publish Lesson</h2></div><div class="inline-actions">
 

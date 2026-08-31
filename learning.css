@@ -1218,3 +1218,28 @@ body{font-family:Inter,sans-serif;background:#fff;color:#0b0f12}body:has(.learni
   }
 
 }
+
+#toggleAssessmentBtn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #d7e0e4;
+  border-radius: 999px;
+  background: #edf3f5;
+  color: #35454d;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: 0.2s ease;
+}
+
+#toggleAssessmentBtn:hover {
+  background: #e2eaed;
+  border-color: #c7d3d8;
+}
+
+#toggleAssessmentBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -53,7 +53,67 @@ function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt
 function openModal(id){$(id).classList.add("open")} function closeModal(id){$(id).classList.remove("open")}
 $$("[data-close]").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
 ["loginOpenBtn","heroLoginBtn"].forEach(id=>$(id).onclick=()=>openModal("loginModal"));
-["registerOpenBtn","heroRegisterBtn"].forEach(id=>$(id).onclick=()=>openModal("registerModal"));
+async function openRegistrationModal() {
+
+  const courseSelect =
+    $("regCourse");
+
+  courseSelect.innerHTML = `
+    <option value="">
+      Loading courses...
+    </option>
+  `;
+
+  openModal("registerModal");
+
+  try {
+
+    const {
+  data,
+  error
+  } = await supabaseClient.rpc(
+    "get_public_learning_courses"
+  );
+
+    if (error) {
+      throw error;
+    }
+
+    courseSelect.innerHTML = `
+      <option value="">
+        Select a course
+      </option>
+
+      ${(data || [])
+        .map(course => `
+          <option value="${course.id}">
+            ${esc(course.title)}
+          </option>
+        `)
+        .join("")}
+    `;
+
+  } catch (error) {
+
+    console.error(
+      "Unable to load registration courses:",
+      error
+    );
+
+    courseSelect.innerHTML = `
+      <option value="">
+        Unable to load courses
+      </option>
+    `;
+  }
+}
+
+["registerOpenBtn","heroRegisterBtn"]
+  .forEach(
+    id =>
+      $(id).onclick =
+        openRegistrationModal
+  );
 
 $("regNationality").onchange=()=>{const sa=$("regNationality").value==="South African";$("identityLabel").textContent=sa?"South African identity number":"Passport number";$("documentLabel").textContent=sa?"Certified ID document":"Valid passport copy"};
 
@@ -87,6 +147,7 @@ if (nameParts.length < 2) {
   const address = $("regAddress").value.trim();
   const education = $("regEducation").value;
   const currentStatus = $("regStatus").value;
+  const courseId = $("regCourse").value;
   const consent = $("regConsent").checked;
 
   msg.className = "form-message";
@@ -96,17 +157,18 @@ if (nameParts.length < 2) {
   // Required fields
   // ----------------------------------------------------------
 
-  if (
-    !fullName ||
-    !email ||
-    !phone ||
-    !nationality ||
-    !birthYear ||
-    !identity ||
-    !address ||
-    !file ||
-    !consent
-  ) {
+if (
+  !fullName ||
+  !email ||
+  !phone ||
+  !nationality ||
+  !birthYear ||
+  !identity ||
+  !address ||
+  !courseId ||
+  !file ||
+  !consent
+) {
     msg.className = "form-message error";
     msg.textContent =
       "Please complete all required fields and attach the required certified ID/passport.";
@@ -159,6 +221,10 @@ if (nameParts.length < 2) {
   formData.append("residential_address", address);
   formData.append("education_level", education);
   formData.append("current_status", currentStatus);
+  formData.append(
+  "course_id",
+  courseId
+);
   formData.append("document", file);
 
   // ----------------------------------------------------------
@@ -374,29 +440,11 @@ return;
 
 async function loadAdminApplications() {
   const {
-    data,
-    error
-  } = await supabaseClient
-    .from("learning_applications")
-    .select(`
-      id,
-      full_name,
-      email,
-      phone,
-      nationality,
-      birth_year,
-      identity_or_passport,
-      residential_address,
-      education_level,
-      current_status,
-      document_path,
-      application_status,
-      rejection_reason,
-      created_at
-    `)
-    .order("created_at", {
-      ascending: false
-    });
+  data,
+  error
+} = await supabaseClient.rpc(
+  "get_admin_learning_applications"
+);
 
   if (error) {
     console.error(
@@ -410,7 +458,7 @@ async function loadAdminApplications() {
   }
 
   state.applications = (data || []).map(app => ({
-    id: app.id,
+    id: app.application_id,
 
     fullName: app.full_name,
     email: app.email,
@@ -432,6 +480,8 @@ async function loadAdminApplications() {
     status: app.application_status,
 
     rejectionReason: app.rejection_reason,
+    courseId: app.course_id,
+    courseTitle: app.course_title || "",
     appliedAt: app.created_at
   }));
 }
@@ -492,6 +542,120 @@ async function loadAdminStudents() {
     progress: {},
     certificates: []
   }));
+}
+
+async function loadAdminCertificates() {
+  const {
+    data,
+    error
+  } = await supabaseClient.rpc(
+    "get_admin_learning_certificates"
+  );
+
+  if (error) {
+    console.error(
+      "Unable to load admin certificates:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load certificates."
+    );
+  }
+
+  // Clear certificate arrays first.
+  state.students.forEach(student => {
+    student.certificates = [];
+  });
+
+  // Attach each certificate to its student.
+  for (const certificate of data || []) {
+    const student =
+      state.students.find(
+        item =>
+          item.id === certificate.student_id
+      );
+
+    if (!student) {
+      continue;
+    }
+
+    student.certificates.push({
+      id: certificate.id,
+
+      courseId:
+        certificate.course_id,
+
+      courseTitle:
+        certificate.course_title,
+
+      certificateCode:
+        certificate.certificate_number,
+
+      score:
+        certificate.score,
+
+      awardedAt:
+        certificate.awarded_at
+    });
+  }
+}
+
+async function loadAdminCourseApplications() {
+  const {
+    data,
+    error
+  } = await supabaseClient.rpc(
+    "get_admin_learning_course_applications"
+  );
+
+  if (error) {
+    console.error(
+      "Unable to load course applications:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load course applications."
+    );
+  }
+
+  state.courseApplications =
+    (data || []).map(
+      application => ({
+        id:
+          application.application_id,
+
+        studentId:
+          application.student_id,
+
+        studentName:
+          application.student_name,
+
+        studentEmail:
+          application.student_email,
+
+        courseId:
+          application.course_id,
+
+        courseTitle:
+          application.course_title,
+
+        status:
+          application.application_status,
+
+        rejectionReason:
+          application.rejection_reason || "",
+
+        appliedAt:
+          application.applied_at,
+
+        reviewedAt:
+          application.reviewed_at
+      })
+    );
+
+  return state.courseApplications;
 }
 
 async function loadCurrentStudent(authUserId) {
@@ -851,13 +1015,13 @@ $("adminLogoutBtn").onclick = async () => {
   showPublic();
 };
 function currentStudent(){return state.students.find(s=>s.id===session?.studentId)}
-async function enrollInCourse(courseId) {
+async function applyForCourse(courseId) {
   try {
     const {
       data,
       error
     } = await supabaseClient.rpc(
-      "enroll_learning_course",
+      "apply_learning_course",
       {
         p_course_id: courseId
       }
@@ -868,34 +1032,32 @@ async function enrollInCourse(courseId) {
     }
 
     alert(
-  "You have enrolled successfully."
-);
+      "Your course application has been submitted for approval."
+    );
 
-await loadStudentEnrollments();
+    await loadStudentCourseApplications();
 
-renderAvailableCourses();
-renderMyCourses();
+    renderAvailableCourses();
 
-return data;
+    return data;
 
   } catch (error) {
     console.error(
-      "Course enrolment failed:",
+      "Course application failed:",
       error
     );
 
     alert(
       error?.message ||
-      "Unable to enrol in this course."
+      "Unable to apply for this course."
     );
 
     return null;
   }
 }
 
-
-window.enrollInCourse =
-  enrollInCourse;
+window.applyForCourse =
+  applyForCourse;
 
 async function loadAvailableCourses() {
   const {
@@ -1030,6 +1192,51 @@ async function loadStudentEnrollments() {
   return state.enrollments;
 }
 
+async function loadStudentCourseApplications() {
+  const {
+    data,
+    error
+  } = await supabaseClient.rpc(
+    "get_my_learning_course_applications"
+  );
+
+  if (error) {
+    console.error(
+      "Unable to load course applications:",
+      error
+    );
+
+    throw new Error(
+      "Unable to load your course applications."
+    );
+  }
+
+  state.courseApplications =
+    (data || []).map(
+      application => ({
+        id:
+          application.application_id,
+
+        courseId:
+          application.course_id,
+
+        status:
+          application.application_status,
+
+        rejectionReason:
+          application.rejection_reason || "",
+
+        appliedAt:
+          application.applied_at,
+
+        reviewedAt:
+          application.reviewed_at
+      })
+    );
+
+  return state.courseApplications;
+}
+
 function renderAvailableCourses() {
   const container =
     $("availableCoursesList");
@@ -1043,6 +1250,9 @@ function renderAvailableCourses() {
 
   const enrollments =
     state.enrollments || [];
+
+    const applications =
+  state.courseApplications || [];
 
   if (!courses.length) {
     container.innerHTML = `
@@ -1074,6 +1284,12 @@ function renderAvailableCourses() {
       )
   );
 
+  const application =
+  applications.find(
+    item =>
+      item.courseId === course.id
+  );
+
       return `
         <article class="course-card">
 
@@ -1103,13 +1319,61 @@ function renderAvailableCourses() {
         }
       </button>
     `
+
+    : application?.status === "pending"
+      ? `
+        <button
+          class="ghost-btn"
+          type="button"
+          disabled
+        >
+          <i class="fa-solid fa-clock"></i>
+          Pending Approval
+        </button>
+      `
+
+    : application?.status === "approved"
+      ? `
+        <button
+          class="ghost-btn"
+          type="button"
+          disabled
+        >
+          <i class="fa-solid fa-check"></i>
+          Approved
+        </button>
+      `
+
+    : application?.status === "rejected"
+      ? `
+        <button
+          class="danger-btn"
+          type="button"
+          disabled
+        >
+          <i class="fa-solid fa-xmark"></i>
+          Application Rejected
+        </button>
+
+        ${
+          application.rejectionReason
+            ? `
+              <p class="form-message error">
+                ${esc(application.rejectionReason)}
+              </p>
+            `
+            : ""
+        }
+      `
+
     : `
       <button
         class="primary-btn"
         type="button"
-        onclick="enrollInCourse('${course.id}')"
+        onclick="applyForCourse('${course.id}')"
       >
-        Enrol
+        <i class="fa-solid fa-paper-plane"></i>
+        Apply for Course
       </button>
     `
 }
@@ -1623,6 +1887,7 @@ async function showStudent() {
   try {
 await loadAvailableCourses();
 await loadStudentEnrollments();
+await loadStudentCourseApplications();
 
 state.course = {
   id: null,
@@ -1671,8 +1936,9 @@ await loadStudentProgress();
 }
 
 async function loadAdminCourse() {
+
   const {
-    data,
+    data: courseRows,
     error
   } = await supabaseClient
     .from("learning_courses")
@@ -1692,8 +1958,8 @@ async function loadAdminCourse() {
     .order("created_at", {
       ascending: false
     })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+
 
   if (error) {
     console.error(
@@ -1705,6 +1971,9 @@ async function loadAdminCourse() {
       "Unable to load the learning course."
     );
   }
+
+  const data =
+  courseRows?.[0] || null;
 
   if (!data) {
     return null;
@@ -1791,11 +2060,13 @@ async function showAdmin() {
   $("studentApp").classList.add("hidden");
 
   try {
- await loadAdminApplications();
+await loadAdminApplications();
 await loadAdminStudents();
+await loadAdminCertificates();
+await loadAdminCourseApplications();
 await loadAdminCourse();
 
-  renderAdmin();
+renderAdmin();
     showAdminView("adminDashboard");
 
   } catch (error) {
@@ -1836,8 +2107,9 @@ $$("[data-student-view]").forEach(
 
           await loadStudentEnrollments();
 
-          renderAvailableCourses();
+          await loadStudentCourseApplications();
 
+          renderAvailableCourses();
           renderMyCourses();
 
         } catch (error) {
@@ -1997,7 +2269,7 @@ const alreadyPassed =
 
 const disabled =
   alreadyPassed ||
-  attempts.length >= 2;ength >= 2;
+  attempts.length >= 2;
 
 
   $("assessmentForm").innerHTML =
@@ -2469,10 +2741,11 @@ function renderAdmin() {
         : "Course is hidden from students.";
 
 
-  renderApplications();
-  renderStudents();
-  renderBuilder();
-  renderAdminCerts();
+    renderApplications();
+    renderCourseApplications();
+    renderStudents();
+    renderBuilder();
+    renderAdminCerts();
 
 
   $("togglePublishBtn").textContent =
@@ -2499,6 +2772,12 @@ function renderApplications() {
                 ${esc(a.email)}
                 •
                 ${esc(a.documentName)}
+              </span>
+              <span>
+                Course:
+                <strong>
+                  ${esc(a.courseTitle || "Not specified")}
+                </strong>
               </span>
             </div>
 
@@ -2539,6 +2818,113 @@ function renderApplications() {
           </div>
         `;
 }
+
+function renderCourseApplications() {
+  const container =
+    $("courseApplicationsTable");
+
+  if (!container) {
+    return;
+  }
+
+  const applications =
+    state.courseApplications || [];
+
+  container.innerHTML =
+    applications.length
+      ? applications.map(application => `
+          <article class="data-row">
+
+            <div class="data-main">
+              <strong>
+                ${esc(application.studentName)}
+              </strong>
+
+              <span>
+                ${esc(application.studentEmail)}
+              </span>
+
+              <span>
+                Course:
+                <strong>
+                  ${esc(application.courseTitle)}
+                </strong>
+              </span>
+            </div>
+
+            <small>
+              ${esc(
+                application.status.toUpperCase()
+              )}
+            </small>
+
+            <small>
+              ${
+                application.appliedAt
+                  ? new Date(
+                      application.appliedAt
+                    ).toLocaleString()
+                  : ""
+              }
+            </small>
+
+            ${
+              application.status === "rejected" &&
+              application.rejectionReason
+                ? `
+                  <small>
+                    Reason:
+                    ${esc(
+                      application.rejectionReason
+                    )}
+                  </small>
+                `
+                : ""
+            }
+
+            <div class="row-actions">
+
+              ${
+                application.status === "pending"
+                  ? `
+                    <button
+                      class="approve"
+                      type="button"
+                      onclick="approveCourseApplication('${application.id}')"
+                    >
+                      Approve
+                    </button>
+
+                    <button
+                      class="reject"
+                      type="button"
+                      onclick="rejectCourseApplication('${application.id}')"
+                    >
+                      Reject
+                    </button>
+                  `
+                  : ""
+              }
+
+            </div>
+
+          </article>
+        `).join("")
+      : `
+          <div class="locked-card">
+            <i class="fa-solid fa-book"></i>
+
+            <h3>
+              No course applications yet
+            </h3>
+
+            <p>
+              Student course applications will appear here.
+            </p>
+          </div>
+        `;
+}
+
 window.approveApplication = async id => {
   const application = state.applications.find(
     a => a.id === id
@@ -2607,6 +2993,68 @@ window.approveApplication = async id => {
     );
   }
 };
+
+window.approveCourseApplication = async id => {
+
+  const application =
+    (state.courseApplications || [])
+      .find(
+        item =>
+          item.id === id
+      );
+
+  if (!application) {
+    return;
+  }
+
+  const confirmed = confirm(
+    `Approve ${application.studentName} for ${application.courseTitle}?`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    const {
+      data,
+      error
+    } = await supabaseClient.rpc(
+      "approve_learning_course_application",
+      {
+        p_application_id: id
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    await loadAdminCourseApplications();
+
+    renderAdmin();
+
+    alert(
+      `${application.studentName} has been approved for ${application.courseTitle}.`
+    );
+
+    return data;
+
+  } catch (error) {
+
+    console.error(
+      "Course application approval failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to approve this course application."
+    );
+  }
+};
+
 window.rejectApplication = async id => {
   const application = state.applications.find(
     a => a.id === id
@@ -2665,6 +3113,85 @@ window.rejectApplication = async id => {
     alert(
       error?.message ||
       "Unable to reject this application."
+    );
+  }
+};
+
+window.rejectCourseApplication = async id => {
+
+  const application =
+    (state.courseApplications || [])
+      .find(
+        item =>
+          item.id === id
+      );
+
+  if (!application) {
+    return;
+  }
+
+  const reason = prompt(
+    `Reason for rejecting ${application.studentName} from ${application.courseTitle}:`,
+    "Course full / requirements not met"
+  );
+
+  if (reason === null) {
+    return;
+  }
+
+  const cleanReason =
+    reason.trim();
+
+  if (!cleanReason) {
+    alert(
+      "Please provide a rejection reason."
+    );
+
+    return;
+  }
+
+  const confirmed = confirm(
+    `Reject ${application.studentName}'s application for ${application.courseTitle}?`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+
+    const {
+      error
+    } = await supabaseClient.rpc(
+      "reject_learning_course_application",
+      {
+        p_application_id: id,
+        p_reason: cleanReason
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    await loadAdminCourseApplications();
+
+    renderAdmin();
+
+    alert(
+      `${application.studentName}'s course application has been rejected.`
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Course application rejection failed:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to reject this course application."
     );
   }
 };
@@ -2813,6 +3340,7 @@ $("saveCourseInfoBtn").onclick = async () => {
     btn.innerHTML = originalText;
   }
 };
+
 $("saveQuestionsBtn").onclick = async () => {
   const btn = $("saveQuestionsBtn");
 
@@ -3263,10 +3791,9 @@ $("toggleAssessmentBtn").onclick = async () => {
       "Unable to update assessment status."
     );
 
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalText;
-  }
+} finally {
+  btn.disabled = false;
+}
 };
 
 $("closeCourseBtn").onclick = async () => {
