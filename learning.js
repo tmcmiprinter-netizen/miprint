@@ -3090,34 +3090,55 @@ function renderCourseApplications() {
 }
 
 window.viewApplicationDocument = async id => {
+  const application =
+    state.applications.find(
+      item => item.id === id
+    );
+
+  if (!application?.documentPath) {
+    alert(
+      "No certified document was found for this application."
+    );
+    return;
+  }
+
+  const previewWindow =
+    window.open("", "_blank");
+
+  if (!previewWindow) {
+    alert(
+      "Please allow pop-ups to view the certified document."
+    );
+    return;
+  }
+
   try {
     const {
       data,
       error
-    } = await supabaseClient.rpc(
-      "get_learning_application_document_url",
-      {
-        p_application_id: id
-      }
-    );
+    } = await supabaseClient.storage
+      .from("learning-documents")
+      .createSignedUrl(
+        application.documentPath,
+        120
+      );
 
     if (error) {
       throw error;
     }
 
-    if (!data) {
+    if (!data?.signedUrl) {
       throw new Error(
         "Document link was not returned."
       );
     }
 
-    window.open(
-      data,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    previewWindow.location.href =
+      data.signedUrl;
 
   } catch (error) {
+    previewWindow.close();
+
     console.error(
       "Unable to open application document:",
       error
