@@ -2939,24 +2939,39 @@ function renderApplications() {
             </small>
 
             <div class="row-actions">
-              ${
-                a.status === "pending"
-                  ? `
-                    <button
-                      class="approve"
-                      onclick="approveApplication('${a.id}')">
-                      Approve
-                    </button>
 
-                    <button
-                      class="reject"
-                      onclick="rejectApplication('${a.id}')">
-                      Reject
-                    </button>
-                  `
-                  : ""
-              }
-            </div>
+        ${
+          a.documentPath
+            ? `
+              <button
+                class="secondary"
+                onclick="viewApplicationDocument('${a.id}')">
+                <i class="fa-solid fa-file-pdf"></i>
+                View ID
+              </button>
+            `
+            : ""
+        }
+
+        ${
+          a.status === "pending"
+            ? `
+              <button
+                class="approve"
+                onclick="approveApplication('${a.id}')">
+                Approve
+              </button>
+
+              <button
+                class="reject"
+                onclick="rejectApplication('${a.id}')">
+                Reject
+              </button>
+            `
+            : ""
+        }
+
+      </div>
 
           </article>
         `).join("")
@@ -3073,6 +3088,47 @@ function renderCourseApplications() {
           </div>
         `;
 }
+
+window.viewApplicationDocument = async id => {
+  try {
+    const {
+      data,
+      error
+    } = await supabaseClient.rpc(
+      "get_learning_application_document_url",
+      {
+        p_application_id: id
+      }
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error(
+        "Document link was not returned."
+      );
+    }
+
+    window.open(
+      data,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+  } catch (error) {
+    console.error(
+      "Unable to open application document:",
+      error
+    );
+
+    alert(
+      error?.message ||
+      "Unable to open the certified document."
+    );
+  }
+};
 
 window.approveApplication = async id => {
   const application = state.applications.find(
